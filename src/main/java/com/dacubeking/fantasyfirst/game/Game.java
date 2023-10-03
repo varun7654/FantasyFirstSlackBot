@@ -15,6 +15,8 @@ import static com.slack.api.model.block.element.BlockElements.button;
 import static java.lang.Math.max;
 
 public class Game implements Serializable {
+
+    public static final long serialVersionUID = -8421916417899141622L;
     public record Team(String name, String number, String elo, UUID uuid) implements Serializable {
         public Team(String number) {
             this(number, number, "0", UUID.randomUUID());
@@ -202,7 +204,7 @@ public class Game implements Serializable {
         var nextPlayerInDraft = getNextPlayerInDraft();
         if (nextPlayerInDraft == null) {
             return List.of(asBlocks(
-                    section(section -> section.text(markdownText("The draft is over!"))),
+                    section(section -> section.text(markdownText("The *" + getGameName() + "* draft is over!"))),
                     section(section -> section.text(markdownText(finalTable))))
             );
         } else {
@@ -213,24 +215,29 @@ public class Game implements Serializable {
             }
 
             var messages = new ArrayList<List<LayoutBlock>>();
+            Main.pickTeamButton.setValue(getGameUuid().toString());
             messages.add(asBlocks(
+                    section(section -> section.text(markdownText("*" + getGameName() + " Draft:*"))),
                     section(section -> section.text(markdownText("It is <@" + nextPlayerInDraft.slackId()
                             + ">'s turn to pick a team"))),
-                    section(section -> section.text(markdownText(finalTable)))
-            ));
-            messages.addAll(
-                    splitTeams.stream().map(groupedTeams -> asBlocks(
-                            actions("DraftingButtons", groupedTeams.stream()
-                                    .map(team -> button(b -> b.text(plainText(pt -> pt.text(team.name)))
-                                            .actionId("pickTeam" + team.uuid)
-                                            .value(getGameUuid() + "," + team.uuid().toString() + "," + turnCount)))
-                                    .collect(Collectors.toList()))
-                    )).collect(Collectors.toList())
-            );
-            messages.add(asBlocks(
+                    section(section -> section.text(markdownText(finalTable))),
+                    actions(actions -> actions.elements(List.of(Main.pickTeamButton))),
                     section(section -> section.text(markdownText("You can still join the draft!"))),
                     getJoiningButtons()
             ));
+//            messages.addAll(
+//                    splitTeams.stream().map(groupedTeams -> asBlocks(
+//                            actions("DraftingButtons", groupedTeams.stream()
+//                                    .map(team -> button(b -> b.text(plainText(pt -> pt.text(team.name)))
+//                                            .actionId("pickTeam" + team.uuid)
+//                                            .value(getGameUuid() + "," + team.uuid().toString() + "," + turnCount)))
+//                                    .collect(Collectors.toList()))
+//                    )).collect(Collectors.toList())
+//            );
+//            messages.add(asBlocks(
+//                    section(section -> section.text(markdownText("You can still join the draft!"))),
+//                    getJoiningButtons()
+//            ));
             return messages;
         }
     }
@@ -263,9 +270,22 @@ public class Game implements Serializable {
         ));
     }
 
-    public void pickTeam(UUID teamNum) {
+    public void pickTeam(UUID teamUuid) {
         for (var team : availableTeams) {
-            if (team.uuid().equals(teamNum)) {
+            if (team.uuid().equals(teamUuid)) {
+                var nextPlayerInDraft = getNextPlayerInDraft();
+                if (nextPlayerInDraft != null) {
+                    nextPlayerInDraft.selectedTeams.add(team);
+                    availableTeams.remove(team);
+                }
+                return;
+            }
+        }
+    }
+
+    public void pickTeam(String teamNum) {
+        for (var team : availableTeams) {
+            if (team.number.equals(teamNum)) {
                 var nextPlayerInDraft = getNextPlayerInDraft();
                 if (nextPlayerInDraft != null) {
                     nextPlayerInDraft.selectedTeams.add(team);

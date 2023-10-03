@@ -5,6 +5,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -19,7 +20,7 @@ public class GetTeamsAtEvent {
         this.apiKey = apiKey;
     }
 
-    public List<Team> getTeamsAtEvent(String eventCode) {
+    public List<Team> getTeamsAtEvent(String eventCode) throws IOException {
         List<Team> teamNumbers = new ArrayList<>();
 
         try {
@@ -60,12 +61,13 @@ public class GetTeamsAtEvent {
             }
         } catch (Exception e) {
             e.printStackTrace();
+            throw e;
         }
 
         return teamNumbers;
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         // Replace with your API key
         String apiKey = "qWWfZIXqIVGwZoLnZxgI7Jq2rBmLQD2KQZ5pm6y73pF6xN3j9F2D9lP0sdtnqBiy";
 

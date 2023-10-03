@@ -39,7 +39,7 @@ public class Screens {
              			"type": "input",
              			"label": {
              				"type": "plain_text",
-             				"text": "List out a comma seperated list of teams (e.g. 254,1678,7157)",
+             				"text": "Enter a TBA event code, or list out a comma seperated list of teams (e.g. 254,1678,7157)",
              				"emoji": true
              			},
              			"element": {

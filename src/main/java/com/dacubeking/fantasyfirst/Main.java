@@ -58,6 +58,7 @@ public class Main {
             System.out.println("No save file found");
             e.printStackTrace();
         }
+
         GetTeamsAtEvent getTeams = new GetTeamsAtEvent(Creds.TBA_API_KEY);
 
         var appConfig = new AppConfig();
@@ -105,14 +106,21 @@ public class Main {
                     .getValue());
             String gameName = extractValueByElementName(values, "event_name").orElseThrow().getValue();
 
-            var teams = new ArrayList<Team>();
-            for (String team : teamListValue.split(",")) {
-                var teamNum = team.trim();
-                if (teamNum.isEmpty() || !Pattern.matches("\\d+", teamNum) || teams.stream().anyMatch(
-                        t -> t.number().equals(teamNum))) {
-                    continue;
+            List<Team> teams;
+
+            if (teamListValue.contains(",")) {
+
+                teams = new ArrayList<>();
+                for (String team : teamListValue.split(",")) {
+                    var teamNum = team.trim();
+                    if (teamNum.isEmpty() || !Pattern.matches("\\d+", teamNum) || teams.stream().anyMatch(
+                            t -> t.number().equals(teamNum))) {
+                        continue;
+                    }
+                    teams.add(new Team(teamNum));
                 }
-                teams.add(new Team(teamNum));
+            } else {
+                teams = getTeams.getTeamsAtEvent(teamListValue);
             }
 
             var game = new Game(selectedChannel, teamsPerAllianceValue, teams, ctx.getRequestUserId(), gameName);

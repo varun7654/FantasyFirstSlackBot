@@ -1,5 +1,6 @@
 package com.dacubeking.fantasyfirst;
 
+import com.dacubeking.fantasyfirst.game.Game.Team;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -18,8 +19,8 @@ public class GetTeamsAtEvent {
         this.apiKey = apiKey;
     }
 
-    public List<Integer> getTeamsAtEvent(String eventCode) {
-        List<Integer> teamNumbers = new ArrayList<>();
+    public List<Team> getTeamsAtEvent(String eventCode) {
+        List<Team> teamNumbers = new ArrayList<>();
 
         try {
             // Create the URL for the API request
@@ -51,8 +52,8 @@ public class GetTeamsAtEvent {
                 JsonArray jsonArray = JsonParser.parseString(response.toString()).getAsJsonArray();
                 for (int i = 0; i < jsonArray.size(); i++) {
                     JsonObject jsonObject = jsonArray.get(i).getAsJsonObject();
-                    int teamNumber = jsonObject.get("team_number").getAsInt();
-                    teamNumbers.add(teamNumber);
+                    String teamNumber = jsonObject.get("team_number").getAsString();
+                    teamNumbers.add(new Team(teamNumber));
                 }
             } else {
                 System.err.println("Error: Unable to retrieve teams. HTTP Response Code: " + responseCode);
@@ -66,13 +67,13 @@ public class GetTeamsAtEvent {
 
     public static void main(String[] args) {
         // Replace with your API key
-        String apiKey = "YOUR_API_KEY";
+        String apiKey = "qWWfZIXqIVGwZoLnZxgI7Jq2rBmLQD2KQZ5pm6y73pF6xN3j9F2D9lP0sdtnqBiy";
 
         // Replace with the event code for the event you want to retrieve teams from
         String eventCode = "2022cala";
 
         GetTeamsAtEvent teamsFetcher = new GetTeamsAtEvent(apiKey);
-        List<Integer> teams = teamsFetcher.getTeamsAtEvent(eventCode);
+        List<Team> teams = teamsFetcher.getTeamsAtEvent(eventCode);
 
         if (!teams.isEmpty()) {
             System.out.println("Teams for event " + eventCode + ": " + teams);

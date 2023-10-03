@@ -17,6 +17,7 @@ import static java.lang.Math.max;
 public class Game implements Serializable {
 
     public static final long serialVersionUID = -8421916417899141622L;
+
     public record Team(String name, String number, String elo, UUID uuid) implements Serializable {
         public Team(String number) {
             this(number, number, "0", UUID.randomUUID());
@@ -262,12 +263,19 @@ public class Game implements Serializable {
     }
 
     public LayoutBlock getJoiningButtons() {
-
-        return actions("GameCreationButtons", asElements(
-                button(b -> b.text(plainText(pt -> pt.text("Join Game"))).actionId("joinGame").value(getGameUuid().toString())),
-                button(b -> b.text(plainText(pt -> pt.text("Leave Game"))).actionId("leaveGame").value(getGameUuid().toString())),
-                button(b -> b.text(plainText(pt -> pt.text("Start Draft"))).actionId("startGame").value(getGameUuid().toString()))
-        ));
+        String gameUuid = getGameUuid().toString();
+        if (hasStarted) {
+            return actions("GameCreationButtons", asElements(
+                    button(b -> b.text(plainText(pt -> pt.text("Join Game"))).actionId("joinGame").value(gameUuid)),
+                    button(b -> b.text(plainText(pt -> pt.text("Leave Game"))).actionId("leaveGame").value(gameUuid))
+            ));
+        } else {
+            return actions("GameCreationButtons", asElements(
+                    button(b -> b.text(plainText(pt -> pt.text("Join Game"))).actionId("joinGame").value(gameUuid)),
+                    button(b -> b.text(plainText(pt -> pt.text("Leave Game"))).actionId("leaveGame").value(gameUuid)),
+                    button(b -> b.text(plainText(pt -> pt.text("Start Draft"))).actionId("startGame").value(gameUuid))
+            ));
+        }
     }
 
     public void pickTeam(UUID teamUuid) {

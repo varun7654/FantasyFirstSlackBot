@@ -77,7 +77,7 @@ public class Screens {
              }
             """.formatted(CREATE_EVENT_CALLBACK_ID);
 
-    public static final String PICK_TEAM_CALLBACK_ID = "pickTeamButton";
+    public static final String PICK_TEAM_CALLBACK_ID = "team_pick_number";
 
     public static final String PICK_A_TEAM = """
             {
@@ -97,6 +97,7 @@ public class Screens {
             		"text": "Cancel",
             		"emoji": true
             	},
+            	"callback_id": "%s",
             	"blocks": [
             		{
             			"type": "divider"
@@ -117,7 +118,7 @@ public class Screens {
             			"elements": [
             				{
             					"type": "mrkdwn",
-            					"text": "*Teams:*"
+            					"text": "*Available Teams:*"
             				}
             			]
             		},
@@ -136,11 +137,20 @@ public class Screens {
             			"element": {
             				"type": "number_input",
             				"is_decimal_allowed": false,
-            				"action_id": "number_input-action"
+            				"action_id": "team_pick_number"
             			},
             			"label": {
             				"type": "plain_text",
             				"text": "Enter your pick (e.g 254)",
+            				"emoji": true
+            			}
+            		},
+            		{
+            			"type": "section",
+            			"block_id": "sectionBlockOnlyPlainText",
+            			"text": {
+            				"type": "plain_text",
+            				"text": "If you're not able to submit this form check that you've entered a valid team & that it's your turn to pick",
             				"emoji": true
             			}
             		}

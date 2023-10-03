@@ -16,6 +16,8 @@ dependencies {
     implementation("com.slack.api:bolt:1.1.+")
     implementation("com.slack.api:bolt-servlet:1.1.+")
     implementation("com.slack.api:bolt-jetty:1.1.+")
+    implementation("com.google.guava:guava:32.1.2-jre")
+    implementation 'org.apache.commons:collections4:3.6'
 }
 
 test {

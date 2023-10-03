@@ -21,6 +21,7 @@ import java.io.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -29,7 +30,6 @@ import static com.slack.api.model.block.Blocks.asBlocks;
 import static com.slack.api.model.view.Views.view;
 
 public class Main {
-
     public static final ButtonElement createEventButton = new ButtonElement();
 
     static {
@@ -41,7 +41,7 @@ public class Main {
 
     static {
         pickTeamButton.setText(new PlainTextObject("Pick A Team", true));
-        pickTeamButton.setActionId("pickTeamButton");
+        pickTeamButton.setActionId("teaam_number_pick");
     }
 
     public static final ConcurrentMap<String, ConcurrentMap<UUID, Game>> games = new ConcurrentHashMap<>(); // <workspaceId, <gameId, game>>
@@ -206,12 +206,10 @@ public class Main {
 
         app.blockAction(Pattern.compile("^pickTeam.*$"), (request, ctx) -> {
             try {
-                System.out.println("Something happened" + request.getPayload().getActions().get(0).getValue());
-                Game game;
-
                 String uuids = request.getPayload().getActions().get(0).getValue();
                 String[] uuidsArray = uuids.split(",");
 
+                Game game;
                 try {
                     var teamId = ctx.getTeamId();
                     var gameId = UUID.fromString(uuidsArray[0]);
@@ -253,7 +251,6 @@ public class Main {
         app.blockAction(pickTeamButton.getActionId(), (blockActionRequest, ctx) -> {
             try {
                 var teamId = ctx.getTeamId();
-                System.out.println(blockActionRequest.getPayload().getActions());
                 var gameId = UUID.fromString(blockActionRequest.getPayload().getActions().get(0).getValue());
                 var game = games.get(teamId).get(gameId);
                 var turnToPick = game.getNextPlayerInDraft();
@@ -265,10 +262,12 @@ public class Main {
 
                 var teamsString = availableTeams.stream().map(Team::number).collect(Collectors.joining(", "));
 
+                print(ctx.client().viewsOpen(viewsOpenRequestBuilder ->
+                        viewsOpenRequestBuilder.viewAsString(
+                                Screens.PICK_A_TEAM.formatted(Screens.PICK_TEAM_CALLBACK_ID + "," + gameId.toString(),
+                                        "<@" + turnToPick.slackId() + ">",
+                                        teamsString)).triggerId(blockActionRequest.getContext().getTriggerId())));
 
-                ctx.client().viewsOpen(viewsOpenRequestBuilder ->
-                        viewsOpenRequestBuilder.viewAsString(Screens.PICK_A_TEAM.formatted("<@" + turnToPick + ">", teamsString))
-                                .triggerId(blockActionRequest.getContext().getTriggerId()));
                 return ctx.ack();
             } catch (Exception e) {
                 e.printStackTrace();
@@ -276,14 +275,35 @@ public class Main {
             }
         });
 
-        app.viewSubmission(Screens.CREATE_EVENT_CALLBACK_ID, (viewSubmissionRequest, ctx) -> {
+        app.viewSubmission(Pattern.compile("^"+ Screens.PICK_TEAM_CALLBACK_ID + ".*$"), (viewSubmissionRequest, ctx) -> {
             try {
                 var values = viewSubmissionRequest.getPayload().getView().getState().getValues();
-                System.out.println(values);
+                var teamPickNumber = extractValueByElementName(values, "team_pick_number").orElseThrow().getValue();
+                var teamId = ctx.getTeamId();
+
+                var gameId = UUID.fromString(viewSubmissionRequest.getPayload().getView().getCallbackId().split(",")[1]);
+                var game = games.get(teamId).get(gameId);
+                var userId = viewSubmissionRequest.getPayload().getUser().getId();
+
+                var nextPlayerInDraft = game.getNextPlayerInDraft();
+                if (nextPlayerInDraft != null && nextPlayerInDraft.slackId().equals(userId)) {
+                    game.pickTeam(teamPickNumber);
+                    for (List<LayoutBlock> layoutBlocks : game.getDraftingMessage()) {
+                        print(ctx.client().chatPostMessage(r -> r
+                                .channel(game.getChannelId())
+                                .blocks(layoutBlocks)));
+                    }
+                } else {
+                    return ctx.ackWithErrors(Map.of("team_pick_number", "Something went wrong"));
+                }
+
+                game.pickTeam(teamPickNumber);
+
+                save();
                 return ctx.ack();
             } catch (Exception e) {
                 e.printStackTrace();
-                return ctx.ack();
+                return ctx.ackWithErrors(Map.of("team_pick_number", "Something went wrong"));
             }
         });
 

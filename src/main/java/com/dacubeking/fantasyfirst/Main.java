@@ -3,7 +3,6 @@ package com.dacubeking.fantasyfirst;
 import com.dacubeking.fantasyfirst.game.Game;
 import com.dacubeking.fantasyfirst.game.Game.Player;
 import com.dacubeking.fantasyfirst.game.Game.Team;
-import com.slack.api.audit.request.ActionsRequest;
 import com.slack.api.bolt.App;
 import com.slack.api.bolt.AppConfig;
 import com.slack.api.bolt.context.builtin.ActionContext;
@@ -23,6 +22,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static com.slack.api.model.block.Blocks.actions;
 import static com.slack.api.model.block.Blocks.asBlocks;
@@ -35,6 +35,13 @@ public class Main {
     static {
         createEventButton.setText(new PlainTextObject("Create Event", true));
         createEventButton.setActionId("createEventButton");
+    }
+
+    public static final ButtonElement pickTeamButton = new ButtonElement();
+
+    static {
+        pickTeamButton.setText(new PlainTextObject("Pick A Team", true));
+        pickTeamButton.setActionId("pickTeamButton");
     }
 
     public static final ConcurrentMap<String, ConcurrentMap<UUID, Game>> games = new ConcurrentHashMap<>(); // <workspaceId, <gameId, game>>
@@ -243,6 +250,43 @@ public class Main {
             }
         });
 
+        app.blockAction(pickTeamButton.getActionId(), (blockActionRequest, ctx) -> {
+            try {
+                var teamId = ctx.getTeamId();
+                System.out.println(blockActionRequest.getPayload().getActions());
+                var gameId = UUID.fromString(blockActionRequest.getPayload().getActions().get(0).getValue());
+                var game = games.get(teamId).get(gameId);
+                var turnToPick = game.getNextPlayerInDraft();
+
+                var availableTeams = game.getAvailableTeams();
+                if (turnToPick == null) {
+                    return Response.ok(ctx.respond("The draft is over"));
+                }
+
+                var teamsString = availableTeams.stream().map(Team::number).collect(Collectors.joining(", "));
+
+
+                ctx.client().viewsOpen(viewsOpenRequestBuilder ->
+                        viewsOpenRequestBuilder.viewAsString(Screens.PICK_A_TEAM.formatted("<@" + turnToPick + ">", teamsString))
+                                .triggerId(blockActionRequest.getContext().getTriggerId()));
+                return ctx.ack();
+            } catch (Exception e) {
+                e.printStackTrace();
+                return Response.ok(ctx.respond("Something went wrong"));
+            }
+        });
+
+        app.viewSubmission(Screens.CREATE_EVENT_CALLBACK_ID, (viewSubmissionRequest, ctx) -> {
+            try {
+                var values = viewSubmissionRequest.getPayload().getView().getState().getValues();
+                System.out.println(values);
+                return ctx.ack();
+            } catch (Exception e) {
+                e.printStackTrace();
+                return ctx.ack();
+            }
+        });
+
         server.start();
     }
 
@@ -255,7 +299,8 @@ public class Main {
         return elementData.map(stringValueMap -> stringValueMap.get(elementName));
     }
 
-    private static void postLeaveJoinMessage(Game game, ActionContext ctx, BlockActionRequest request) throws SlackApiException, IOException {
+    private static void postLeaveJoinMessage(Game game, ActionContext ctx,
+                                             BlockActionRequest request) throws SlackApiException, IOException {
         if (game.hasStarted()) {
             for (List<LayoutBlock> layoutBlocks : game.getDraftingMessage()) {
                 print(ctx.client().chatPostMessage(r -> r

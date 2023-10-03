@@ -58,7 +58,7 @@ public class Main {
             System.out.println("No save file found");
             e.printStackTrace();
         }
-
+        GetTeamsAtEvent getTeams = new GetTeamsAtEvent(Creds.TBA_API_KEY);
 
         var appConfig = new AppConfig();
         appConfig.setSigningSecret(Creds.SLACK_SIGNING_KEY);

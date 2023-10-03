@@ -69,7 +69,7 @@ public class GetTeamsAtEvent {
 
     public static void main(String[] args) throws IOException {
         // Replace with your API key
-        String apiKey = "qWWfZIXqIVGwZoLnZxgI7Jq2rBmLQD2KQZ5pm6y73pF6xN3j9F2D9lP0sdtnqBiy";
+        String apiKey = Creds.TBA_API_KEY;
 
         // Replace with the event code for the event you want to retrieve teams from
         String eventCode = "2022cala";

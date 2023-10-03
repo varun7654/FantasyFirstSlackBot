@@ -1,9 +1,14 @@
 plugins {
     id 'java'
+    id "application"
+    id 'com.github.johnrengelman.shadow' version '7.1.2'
 }
 
-group 'org.example'
+group 'com.dacubeking.fantasyfirst'
 version '1.0-SNAPSHOT'
+application {
+    mainClassName = "com.dacubeking.fantasyfirst.Main"
+}
 
 repositories {
     mavenCentral()
@@ -16,10 +21,18 @@ dependencies {
     implementation("com.slack.api:bolt:1.1.+")
     implementation("com.slack.api:bolt-servlet:1.1.+")
     implementation("com.slack.api:bolt-jetty:1.1.+")
-    implementation("com.google.guava:guava:32.1.2-jre")
-    implementation 'org.apache.commons:collections4:3.6'
+//    implementation("com.google.guava:guava:32.1.2-jre")
+//    implementation 'org.apache.commons:collections4:3.6'
 }
 
 test {
     useJUnitPlatform()
+}
+
+jar {
+    manifest {
+        attributes(
+                'Main-Class': mainClassName
+        )
+    }
 }

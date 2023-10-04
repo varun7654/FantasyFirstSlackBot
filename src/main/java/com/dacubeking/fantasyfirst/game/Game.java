@@ -6,6 +6,7 @@ import com.slack.api.model.block.LayoutBlock;
 import java.io.Serializable;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.slack.api.model.block.Blocks.*;
 import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
@@ -169,59 +170,38 @@ public class Game implements Serializable {
     public List<List<LayoutBlock>> getDraftingMessage() {
         turnCount++;
         // Print out the current state of the draft in a table
-
-        int longestTeamName = max(availableTeams.stream().map(Team::name).mapToInt(String::length).max().orElse(0),
-                4 + String.valueOf(allianceSize).length());
-        int longestName = max(players.stream().map(Player::name).mapToInt(String::length).max().orElse(0), 4);
-
-        String table = "";
-        table += "```";
-        table += "Name" + " ".repeat(longestName - 4) + " | ";
-        for (int i = 0; i < allianceSize; i++) {
-            table += "team" + (i + 1) + " ".repeat(longestTeamName - 5) + " | ";
-        }
-        table += "\n";
-
-        var divider = "-".repeat(table.length() - 5) + "\n";
-        table += divider;
-        for (var player : players) {
-            table += player.name + " ".repeat(longestName - player.name.length()) + " | ";
-            for (int i = 0; i < allianceSize; i++) {
-                if (player.selectedTeams().size() > i) {
-                    table += player.selectedTeams().get(i).name + " "
-                            .repeat(longestTeamName - player.selectedTeams().get(i).name.length()) + " | ";
-                } else {
-                    table += " ".repeat(longestTeamName) + " | ";
-                }
-            }
-            table += "\n";
-        }
-        table += divider;
-        table += "```";
-
-        String finalTable = table;
-
+        LayoutBlock table = section(section -> section.fields(
+                players.stream().map(player ->
+                        Stream.of(markdownText("*Player:*\n" + player.name()),
+                                markdownText("│  *Teams Drafted:*\n│  " +
+                                        player.selectedTeams().stream()
+                                                .map(Team::number)
+                                                .collect(Collectors.joining(", "))
+                                + ((getAllianceSize() - player.selectedTeams().size() == 0) ? "" :
+                                        "\n│  _..." +(getAllianceSize() - player.selectedTeams().size())
+                                        + " additional team"
+                                        + (getAllianceSize() - player.selectedTeams().size() == 1 ? "" : "s")
+                                        + " left to pick_"))
+                ).collect(Collectors.toList()))
+                        .flatMap(Collection::stream)
+                        .collect(Collectors.toList())
+        ));
         // Get the next person in the draft order
         var nextPlayerInDraft = getNextPlayerInDraft();
         if (nextPlayerInDraft == null) {
             return List.of(asBlocks(
                     section(section -> section.text(markdownText("The *" + getGameName() + "* draft is over!"))),
-                    section(section -> section.text(markdownText(finalTable))))
-            );
+                    table
+            ));
         } else {
             // Split the available teams into groups of no greater than 25 so that they can be displayed in slack
-            var splitTeams = new ArrayList<ArrayList<Team>>();
-            for (int i = 0; i < availableTeams.size(); i += 21) {
-                splitTeams.add(new ArrayList<>(availableTeams.subList(i, Math.min(i + 21, availableTeams.size()))));
-            }
-
             var messages = new ArrayList<List<LayoutBlock>>();
             Main.pickTeamButton.setValue(getGameUuid().toString());
             messages.add(asBlocks(
                     section(section -> section.text(markdownText("*" + getGameName() + " Draft:*"))),
                     section(section -> section.text(markdownText("It is <@" + nextPlayerInDraft.slackId()
                             + ">'s turn to pick a team"))),
-                    section(section -> section.text(markdownText(finalTable))),
+                    table,
                     actions(actions -> actions.elements(List.of(Main.pickTeamButton))),
                     section(section -> section.text(markdownText("You can still join the draft!"))),
                     getJoiningButtons()

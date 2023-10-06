@@ -21,6 +21,8 @@ import com.slack.api.model.block.composition.PlainTextObject;
 import com.slack.api.model.block.element.ButtonElement;
 import com.slack.api.model.event.AppHomeOpenedEvent;
 import com.slack.api.model.view.ViewState.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.*;
@@ -32,6 +34,7 @@ import java.util.stream.Collectors;
 import static com.slack.api.model.block.Blocks.*;
 import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
 import static com.slack.api.model.view.Views.view;
+
 public class Main {
     public static final ButtonElement createEventButton = new ButtonElement();
     public static final String DATA_DIR = "./data";
@@ -49,6 +52,8 @@ public class Main {
     }
 
     public static final ConcurrentMap<String, ConcurrentMap<UUID, Game>> games = new ConcurrentHashMap<>(); // <workspaceId, <gameId, game>>
+
+    static final Logger logger = LoggerFactory.getLogger(Main.class);
 
 
     public static void main(String[] args) throws Exception {
@@ -73,6 +78,8 @@ public class Main {
         appConfig.setSigningSecret(Creds.SLACK_SIGNING_KEY);
         appConfig.setSingleTeamBotToken(Creds.SLACK_BOT_TOKEN);
         appConfig.setSigningSecret(Creds.SLACK_SIGNING_KEY);
+        appConfig.setClientId(Creds.SLACK_CLIENT_ID);
+        appConfig.setClientSecret(Creds.SLACK_CLIENT_SECRET);
 
         var app = new App(appConfig);
         app.service(installationService);
@@ -176,8 +183,15 @@ public class Main {
                 return Response.ok(ctx.respond("Could not find your game"));
             }
 
+
+            MethodsClient methods = ctx.client();
             var userId = request.getPayload().getUser().getId();
-            var realName = request.getPayload().getUser().getUsername();
+            System.out.println(userId);
+            var realName = methods.usersInfo(r -> r.user(userId)).getUser().getProfile().getRealName();
+            if (realName == null || realName.isEmpty()) {
+                realName = request.getPayload().getUser().getName();
+            }
+
             if (game.isFull()) {
                 return Response.ok(ctx.respond("This game is full"));
             }
@@ -187,7 +201,6 @@ public class Main {
 
             game.addPlayer(new Player(userId, realName));
             save();
-
             postLeaveJoinMessage(game, ctx, request);
             return ctx.ack();
         });
@@ -365,16 +378,16 @@ public class Main {
                         .blocks(layoutBlocks)));
             }
         } else {
-            ctx.client().chatUpdate(r -> r
+            print(ctx.client().chatUpdate(r -> r
                     .channel(game.getChannelId())
                     .ts(request.getPayload().getMessage().getTs())
-                    .blocks(game.getGameRegistrationMessage()));
+                    .blocks(game.getGameRegistrationMessage())));
         }
     }
 
     public static void print(SlackApiResponse response) {
         if (!response.isOk()) {
-            System.out.println(response);
+            logger.warn(response.toString());
         }
     }
 

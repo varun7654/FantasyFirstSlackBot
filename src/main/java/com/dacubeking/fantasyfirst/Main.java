@@ -21,14 +21,12 @@ import java.io.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static com.slack.api.model.block.Blocks.actions;
-import static com.slack.api.model.block.Blocks.asBlocks;
+import static com.slack.api.model.block.Blocks.*;
+import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
 import static com.slack.api.model.view.Views.view;
-
 public class Main {
     public static final ButtonElement createEventButton = new ButtonElement();
 
@@ -72,11 +70,23 @@ public class Main {
 
 
         app.event(AppHomeOpenedEvent.class, (payload, ctx) -> {
+            var myGames = games.get(ctx.getTeamId()).values().stream()
+                    .filter(game -> game.getGameOwnerSlackId().equals(payload.getEvent().getUser())).collect(Collectors.toList());
+
             var appHomeView = view(view -> view
                     .type("home")
                     .blocks(asBlocks(
-                            actions(actions -> actions.elements(List.of(createEventButton)))
-                    ))
+                                    actions(actions -> actions.elements(List.of(createEventButton))),
+                                    section(section -> section.text(markdownText("*Your Games*"))),
+                                    divider(),
+                                    section(section -> section.text(markdownText("Game:ID"))),
+                                    section(section -> section.text(
+                                            markdownText(myGames.stream().map(game -> "*%s*:%s".formatted(game.getGameName()
+                                                    , game.getGameUuid().toString())).collect(Collectors.joining(
+                                                    "\n")))))
+                            )
+                    )
+
             );
 
             var res = ctx.client().viewsPublish(r -> r
@@ -283,7 +293,7 @@ public class Main {
             }
         });
 
-        app.viewSubmission(Pattern.compile("^"+ Screens.PICK_TEAM_CALLBACK_ID + ".*$"), (viewSubmissionRequest, ctx) -> {
+        app.viewSubmission(Pattern.compile("^" + Screens.PICK_TEAM_CALLBACK_ID + ".*$"), (viewSubmissionRequest, ctx) -> {
             try {
                 var values = viewSubmissionRequest.getPayload().getView().getState().getValues();
                 var teamPickNumber = extractValueByElementName(values, "team_pick_number").orElseThrow().getValue();

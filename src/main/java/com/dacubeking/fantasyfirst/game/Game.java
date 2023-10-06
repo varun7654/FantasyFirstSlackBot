@@ -173,12 +173,12 @@ public class Game implements Serializable {
         LayoutBlock table = section(section -> section.fields(
                 players.stream().map(player ->
                         Stream.of(markdownText("*Player:*\n" + player.name()),
-                                markdownText("│  *Teams Drafted:*\n│  " +
+                                markdownText("   *Teams Drafted:*\n   " +
                                         player.selectedTeams().stream()
                                                 .map(Team::number)
                                                 .collect(Collectors.joining(", "))
                                 + ((getAllianceSize() - player.selectedTeams().size() == 0) ? "" :
-                                        "\n│  _..." +(getAllianceSize() - player.selectedTeams().size())
+                                        "\n   _..." +(getAllianceSize() - player.selectedTeams().size())
                                         + " additional team"
                                         + (getAllianceSize() - player.selectedTeams().size() == 1 ? "" : "s")
                                         + " left to pick_"))

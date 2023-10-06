@@ -9,6 +9,11 @@ import com.slack.api.bolt.context.builtin.ActionContext;
 import com.slack.api.bolt.jetty.SlackAppServer;
 import com.slack.api.bolt.request.builtin.BlockActionRequest;
 import com.slack.api.bolt.response.Response;
+import com.slack.api.bolt.service.InstallationService;
+import com.slack.api.bolt.service.OAuthStateService;
+import com.slack.api.bolt.service.builtin.FileInstallationService;
+import com.slack.api.bolt.service.builtin.FileOAuthStateService;
+import com.slack.api.methods.MethodsClient;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.SlackApiResponse;
 import com.slack.api.model.block.LayoutBlock;
@@ -29,6 +34,7 @@ import static com.slack.api.model.block.composition.BlockCompositions.markdownTe
 import static com.slack.api.model.view.Views.view;
 public class Main {
     public static final ButtonElement createEventButton = new ButtonElement();
+    public static final String DATA_DIR = "./data";
 
     static {
         createEventButton.setText(new PlainTextObject("Create Event", true));
@@ -60,14 +66,27 @@ public class Main {
         GetTeamsAtEvent getTeams = new GetTeamsAtEvent(Creds.TBA_API_KEY);
 
         var appConfig = new AppConfig();
+        new File(DATA_DIR).mkdirs();
+        InstallationService installationService = new FileInstallationService(appConfig, DATA_DIR);
+        installationService.setHistoricalDataEnabled(true);
+
         appConfig.setSigningSecret(Creds.SLACK_SIGNING_KEY);
         appConfig.setSingleTeamBotToken(Creds.SLACK_BOT_TOKEN);
+        appConfig.setSigningSecret(Creds.SLACK_SIGNING_KEY);
+
         var app = new App(appConfig);
+        app.service(installationService);
 
-        // All the room in the world for your code
+        App oauthApp = new App(appConfig).asOAuthApp(true);
+        oauthApp.service(installationService);
 
-        var server = new SlackAppServer(app);
+        OAuthStateService stateService = new FileOAuthStateService(appConfig, DATA_DIR);
+        oauthApp.service(stateService);
 
+        SlackAppServer server = new SlackAppServer(new HashMap<>(Map.of(
+                "/slack/events", app, // POST /slack/events (incoming API requests from the Slack Platform)
+                "/slack/oauth", oauthApp // GET  /slack/oauth/start, /slack/oauth/callback (user access)
+        )));
 
         app.event(AppHomeOpenedEvent.class, (payload, ctx) -> {
             var myGames = games.get(ctx.getTeamId()).values().stream()

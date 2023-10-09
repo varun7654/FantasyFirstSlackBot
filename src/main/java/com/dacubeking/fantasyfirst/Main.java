@@ -11,6 +11,7 @@ import com.slack.api.bolt.request.builtin.BlockActionRequest;
 import com.slack.api.bolt.response.Response;
 import com.slack.api.bolt.service.InstallationService;
 import com.slack.api.bolt.service.OAuthStateService;
+import com.slack.api.bolt.service.builtin.ClientOnlyOAuthStateService;
 import com.slack.api.bolt.service.builtin.FileInstallationService;
 import com.slack.api.bolt.service.builtin.FileOAuthStateService;
 import com.slack.api.methods.MethodsClient;
@@ -76,13 +77,15 @@ public class Main {
         installationService.setHistoricalDataEnabled(true);
 
         appConfig.setSigningSecret(Creds.SLACK_SIGNING_KEY);
+//        appConfig.setClientId(Creds.SLACK_CLIENT_ID);
+//        appConfig.setClientSecret(Creds.SLACK_CLIENT_SECRET);
         appConfig.setSingleTeamBotToken(Creds.SLACK_BOT_TOKEN);
-        appConfig.setSigningSecret(Creds.SLACK_SIGNING_KEY);
-        appConfig.setClientId(Creds.SLACK_CLIENT_ID);
-        appConfig.setClientSecret(Creds.SLACK_CLIENT_SECRET);
+//        appConfig.setScope("chat:write,chat:write.public,users:read,users.profile:read");
+//        appConfig.setOauthCompletionUrl("https://fantasyfirst.dacubeking.com/slack/oauth/completion");
+//        appConfig.setOauthCancellationUrl("https://fantasyfirst.dacubeking.com/slack/oauth/cancellation");
 
         var app = new App(appConfig);
-        app.service(installationService);
+        //app.service(installationService);
 
         App oauthApp = new App(appConfig).asOAuthApp(true);
         oauthApp.service(installationService);
@@ -90,10 +93,7 @@ public class Main {
         OAuthStateService stateService = new FileOAuthStateService(appConfig, DATA_DIR);
         oauthApp.service(stateService);
 
-        SlackAppServer server = new SlackAppServer(new HashMap<>(Map.of(
-                "/slack/events", app, // POST /slack/events (incoming API requests from the Slack Platform)
-                "/slack/oauth", oauthApp // GET  /slack/oauth/start, /slack/oauth/callback (user access)
-        )));
+        SlackAppServer server = new SlackAppServer(app);
 
         app.event(AppHomeOpenedEvent.class, (payload, ctx) -> {
             var myGames = games.get(ctx.getTeamId()).values().stream()
@@ -355,6 +355,24 @@ public class Main {
                 e.printStackTrace();
                 return ctx.ackWithErrors(Map.of("team_pick_number", "Something went wrong"));
             }
+        });
+
+        oauthApp.endpoint("GET", "/slack/oauth/completion", (req, ctx) -> {
+            logger.info("completion: {}", req.getRequestBodyAsString());
+            return Response.builder()
+                    .statusCode(200)
+                    .contentType("text/html")
+                    .body(req.getRequestBodyAsString())
+                    .build();
+        });
+
+        oauthApp.endpoint("GET", "/slack/oauth/cancellation", (req, ctx) -> {
+            logger.info("cancellation: {}", req.getRequestBodyAsString());
+            return Response.builder()
+                    .statusCode(200)
+                    .contentType("text/html")
+                    .body(req.getRequestBodyAsString())
+                    .build();
         });
 
         server.start();

@@ -11,7 +11,6 @@ import com.slack.api.bolt.request.builtin.BlockActionRequest;
 import com.slack.api.bolt.response.Response;
 import com.slack.api.bolt.service.InstallationService;
 import com.slack.api.bolt.service.OAuthStateService;
-import com.slack.api.bolt.service.builtin.ClientOnlyOAuthStateService;
 import com.slack.api.bolt.service.builtin.FileInstallationService;
 import com.slack.api.bolt.service.builtin.FileOAuthStateService;
 import com.slack.api.methods.MethodsClient;
@@ -105,10 +104,10 @@ public class Main {
                                     actions(actions -> actions.elements(List.of(createEventButton))),
                                     section(section -> section.text(markdownText("*Your Games*"))),
                                     divider(),
-                                    section(section -> section.text(markdownText("Game:ID"))),
                                     section(section -> section.text(
-                                            markdownText(myGames.stream().map(game -> "*%s*:%s".formatted(game.getGameName()
-                                                    , game.getGameUuid().toString())).collect(Collectors.joining(
+                                            markdownText("Game:ID\n" +
+                                                    myGames.stream().map(game -> "*%s*:%s".formatted(game.getGameName(),
+                                                    game.getGameUuid().toString())).collect(Collectors.joining(
                                                     "\n")))))
                             )
                     )

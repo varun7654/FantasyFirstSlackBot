@@ -9,10 +9,6 @@ import com.slack.api.bolt.context.builtin.ActionContext;
 import com.slack.api.bolt.jetty.SlackAppServer;
 import com.slack.api.bolt.request.builtin.BlockActionRequest;
 import com.slack.api.bolt.response.Response;
-import com.slack.api.bolt.service.InstallationService;
-import com.slack.api.bolt.service.OAuthStateService;
-import com.slack.api.bolt.service.builtin.FileInstallationService;
-import com.slack.api.bolt.service.builtin.FileOAuthStateService;
 import com.slack.api.methods.MethodsClient;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.SlackApiResponse;
@@ -71,28 +67,34 @@ public class Main {
         GetTeamsAtEvent getTeams = new GetTeamsAtEvent(Creds.TBA_API_KEY);
 
         var appConfig = new AppConfig();
-        new File(DATA_DIR).mkdirs();
-        InstallationService installationService = new FileInstallationService(appConfig, DATA_DIR);
-        installationService.setHistoricalDataEnabled(true);
+//        new File(DATA_DIR).mkdirs();
+//        InstallationService installationService = new FileInstallationService(appConfig, DATA_DIR);
+//        installationService.setHistoricalDataEnabled(true);
 
         appConfig.setSigningSecret(Creds.SLACK_SIGNING_KEY);
-//        appConfig.setClientId(Creds.SLACK_CLIENT_ID);
-//        appConfig.setClientSecret(Creds.SLACK_CLIENT_SECRET);
         appConfig.setSingleTeamBotToken(Creds.SLACK_BOT_TOKEN);
-//        appConfig.setScope("chat:write,chat:write.public,users:read,users.profile:read");
-//        appConfig.setOauthCompletionUrl("https://fantasyfirst.dacubeking.com/slack/oauth/completion");
-//        appConfig.setOauthCancellationUrl("https://fantasyfirst.dacubeking.com/slack/oauth/cancellation");
 
         var app = new App(appConfig);
         //app.service(installationService);
+        
+        App oauthApp = new App(AppConfig.builder()
+                .clientId(Creds.SLACK_CLIENT_ID)
+                .signingSecret(Creds.SLACK_SIGNING_KEY)
+                .clientSecret(Creds.SLACK_CLIENT_SECRET)
+                .redirectUri("https://dacubeking.com/slack/oauth/completion")
+                .scope("chat:write,chat:write.public,users:read,users.profile:read")
+                .appPath("/slack/oauth/start")
+                .oauthCallbackPath("/slack/oauth/callback")
+                .oauthCancellationUrl("https://dacubeking.com/slack/oauth/cancellation")
+                .oauthCompletionUrl("https://dacubeking.com/slack/oauth/completion")
+                .build()).asOAuthApp(true);
 
-        App oauthApp = new App(appConfig).asOAuthApp(true);
-        oauthApp.service(installationService);
+        SlackAppServer server = new SlackAppServer(new HashMap<>(Map.of(
+                "/slack/events", app, // POST /slack/events (incoming API requests from the Slack Platform)
+                "/slack/oauth", oauthApp // GET  /slack/oauth/start, /slack/oauth/callback (user access)
+        )));
 
-        OAuthStateService stateService = new FileOAuthStateService(appConfig, DATA_DIR);
-        oauthApp.service(stateService);
-
-        SlackAppServer server = new SlackAppServer(app);
+        //SlackAppServer server = new SlackAppServer(app);
 
         app.event(AppHomeOpenedEvent.class, (payload, ctx) -> {
             var myGames = games.get(ctx.getTeamId()).values().stream()
@@ -107,8 +109,8 @@ public class Main {
                                     section(section -> section.text(
                                             markdownText("Game:ID\n" +
                                                     myGames.stream().map(game -> "*%s*:%s".formatted(game.getGameName(),
-                                                    game.getGameUuid().toString())).collect(Collectors.joining(
-                                                    "\n")))))
+                                                            game.getGameUuid().toString())).collect(Collectors.joining(
+                                                            "\n")))))
                             )
                     )
 

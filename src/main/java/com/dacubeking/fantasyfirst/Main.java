@@ -76,7 +76,7 @@ public class Main {
 
         var app = new App(appConfig);
         //app.service(installationService);
-        
+
         App oauthApp = new App(AppConfig.builder()
                 .clientId(Creds.SLACK_CLIENT_ID)
                 .signingSecret(Creds.SLACK_SIGNING_KEY)
@@ -280,7 +280,9 @@ public class Main {
                 if (nextPlayerInDraft != null && nextPlayerInDraft.slackId().equals(userId)) {
                     System.out.println(request.getPayload());
                     var teamUuid = UUID.fromString(uuidsArray[1]);
-                    game.pickTeam(teamUuid);
+                    if (!game.pickTeam(teamUuid)) {
+                        return Response.ok(ctx.respond("This team is not available"));
+                    }
                     for (List<LayoutBlock> layoutBlocks : game.getDraftingMessage()) {
                         print(ctx.client().chatPostMessage(r -> r
                                 .channel(game.getChannelId())

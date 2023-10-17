@@ -172,19 +172,10 @@ public class Game implements Serializable {
         // Print out the current state of the draft in a table
         LayoutBlock table = section(section -> section.fields(
                 players.stream().map(player ->
-                        Stream.of(markdownText("*Player:*\n" + player.name()),
-                                markdownText("   *Teams Drafted:*\n   " +
-                                        player.selectedTeams().stream()
-                                                .map(Team::number)
-                                                .collect(Collectors.joining(", "))
-                                + ((getAllianceSize() - player.selectedTeams().size() == 0) ? "" :
-                                        "\n   _..." +(getAllianceSize() - player.selectedTeams().size())
-                                        + " additional team"
-                                        + (getAllianceSize() - player.selectedTeams().size() == 1 ? "" : "s")
-                                        + " left to pick_"))
-                ).collect(Collectors.toList()))
-                        .flatMap(Collection::stream)
-                        .collect(Collectors.toList())
+                        markdownText(
+                                "*" + player.name() + "*: " +
+                                        player.selectedTeams().stream().map(Team::name).collect(Collectors.joining(", ")
+                ))).collect(Collectors.toList())
         ));
         // Get the next person in the draft order
         var nextPlayerInDraft = getNextPlayerInDraft();
@@ -258,17 +249,19 @@ public class Game implements Serializable {
         }
     }
 
-    public void pickTeam(UUID teamUuid) {
+    public boolean pickTeam(UUID teamUuid) {
         for (var team : availableTeams) {
             if (team.uuid().equals(teamUuid)) {
                 var nextPlayerInDraft = getNextPlayerInDraft();
                 if (nextPlayerInDraft != null) {
                     nextPlayerInDraft.selectedTeams.add(team);
                     availableTeams.remove(team);
+                    return true;
                 }
-                return;
+                return false;
             }
         }
+        return false;
     }
 
     public void pickTeam(String teamNum) {

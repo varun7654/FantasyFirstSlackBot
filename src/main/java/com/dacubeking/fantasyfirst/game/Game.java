@@ -169,22 +169,34 @@ public class Game implements Serializable {
 
     public List<List<LayoutBlock>> getDraftingMessage() {
         turnCount++;
-        // Print out the current state of the draft in a table
-        LayoutBlock table = section(section -> section.fields(
-                players.stream().map(player ->
-                        markdownText(
-                                "*" + player.name() + "*: " +
-                                        player.selectedTeams().stream().map(Team::name).collect(Collectors.joining(", ")
-                ))).collect(Collectors.toList())
-        ));
         // Get the next person in the draft order
         var nextPlayerInDraft = getNextPlayerInDraft();
         if (nextPlayerInDraft == null) {
+            // Print out the current state of the draft in a table
+            LayoutBlock table = section(section -> section.fields(
+                    players.stream().map(player ->
+                            markdownText(
+                                     player.name() + " | " +
+                                            player.selectedTeams().stream().map(Team::name).collect(Collectors.joining("| ")
+                    ))).collect(Collectors.toList())
+            ));
             return List.of(asBlocks(
                     section(section -> section.text(markdownText("The *" + getGameName() + "* draft is over!"))),
-                    table
+                    markdownText("```" + table + "```");
             ));
+
+
         } else {
+        
+        
+            // Print out the current state of the draft in a table
+            LayoutBlock table = section(section -> section.fields(
+                    players.stream().map(player ->
+                            markdownText(
+                                    "*" + player.name() + "*: " +
+                                            player.selectedTeams().stream().map(Team::name).collect(Collectors.joining(", ")
+                    ))).collect(Collectors.toList())
+            ));
             // Split the available teams into groups of no greater than 25 so that they can be displayed in slack
             var messages = new ArrayList<List<LayoutBlock>>();
             Main.pickTeamButton.setValue(getGameUuid().toString());

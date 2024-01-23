@@ -6,6 +6,7 @@ import com.dacubeking.fantasyfirst.game.Game.Team;
 import com.slack.api.bolt.App;
 import com.slack.api.bolt.AppConfig;
 import com.slack.api.bolt.context.builtin.ActionContext;
+import com.slack.api.bolt.context.builtin.EventContext;
 import com.slack.api.bolt.jetty.SlackAppServer;
 import com.slack.api.bolt.request.builtin.BlockActionRequest;
 import com.slack.api.bolt.response.Response;
@@ -100,20 +101,30 @@ public class Main {
             var myGames = games.get(ctx.getTeamId()).values().stream()
                     .filter(game -> game.getGameOwnerSlackId().equals(payload.getEvent().getUser())).collect(Collectors.toList());
 
+            var gamesText = myGames.stream().map(
+                            game -> {
+                                var list = new ArrayList<String>();
+                                list.add("*%s* (%s) (%s)\n%s"
+                                        .formatted(game.getGameName(), game.getGameUuid().toString(),
+                                                game.getLastMessagesTs() != null ?
+                                                        getMessageLink(ctx, game.getChannelId(), game.getLastMessagesTs().get(0))
+                                                        : "no message link",
+                                                game.getMarkdownTable()));
+                                return list;
+                            })
+                    .flatMap(Collection::stream)
+                    .collect(Collectors.joining("\n"));
+
+
             var appHomeView = view(view -> view
                     .type("home")
                     .blocks(asBlocks(
                                     actions(actions -> actions.elements(List.of(createEventButton))),
                                     section(section -> section.text(markdownText("*Your Games*"))),
                                     divider(),
-                                    section(section -> section.text(
-                                            markdownText("Game:ID\n" +
-                                                    myGames.stream().map(game -> "*%s*:%s".formatted(game.getGameName(),
-                                                            game.getGameUuid().toString())).collect(Collectors.joining(
-                                                            "\n")))))
+                                    section(section -> section.text(markdownText(gamesText)))
                             )
                     )
-
             );
 
             var res = ctx.client().viewsPublish(r -> r
@@ -166,9 +177,9 @@ public class Main {
 
             System.out.println(game);
 
-            print(ctx.client().chatPostMessage(r -> r
+            game.setLastMessagesTs(List.of(ctx.client().chatPostMessage(r -> r
                     .channel(selectedChannel)
-                    .blocks(game.getGameRegistrationMessage())));
+                    .blocks(game.getGameRegistrationMessage())).getTs()));
 
             save();
             System.out.printf("teamList: %s selectedChannel: %s teamsPerAlliance: %d%n", teamListValue, selectedChannel,
@@ -244,11 +255,13 @@ public class Main {
                 return Response.ok(ctx.respond("This game has already started"));
             } else {
                 game.start();
+                var messageTs = new ArrayList<String>();
                 for (List<LayoutBlock> layoutBlocks : game.getDraftingMessage()) {
-                    print(ctx.client().chatPostMessage(r -> r
+                    messageTs.add(ctx.client().chatPostMessage(r -> r
                             .channel(game.getChannelId())
-                            .blocks(layoutBlocks)));
+                            .blocks(layoutBlocks)).getTs());
                 }
+                game.setLastMessagesTs(messageTs);
             }
             save();
 
@@ -341,11 +354,20 @@ public class Main {
                 var nextPlayerInDraft = game.getNextPlayerInDraft();
                 if (nextPlayerInDraft != null && nextPlayerInDraft.slackId().equals(userId)) {
                     game.pickTeam(teamPickNumber);
+                    var messageTs = new ArrayList<String>();
                     for (List<LayoutBlock> layoutBlocks : game.getDraftingMessage()) {
-                        print(ctx.client().chatPostMessage(r -> r
+                         messageTs.add(ctx.client().chatPostMessage(r -> r
                                 .channel(game.getChannelId())
-                                .blocks(layoutBlocks)));
+                                .blocks(layoutBlocks)).getTs());
                     }
+
+                    if (game.getLastMessagesTs() != null) {
+                        for (String s : game.getLastMessagesTs()) {
+                            ctx.client().chatDelete(r -> r.channel(game.getChannelId()).ts(s));
+                        }
+                    }
+
+                    game.setLastMessagesTs(messageTs);
                 } else {
                     return ctx.ackWithErrors(Map.of("team_pick_number", "Something went wrong"));
                 }
@@ -406,10 +428,11 @@ public class Main {
         }
     }
 
-    public static void print(SlackApiResponse response) {
+    public static SlackApiResponse print(SlackApiResponse response) {
         if (!response.isOk()) {
             logger.warn(response.toString());
         }
+        return response;
     }
 
     public static void save() {
@@ -423,5 +446,9 @@ public class Main {
             System.out.println("Error saving");
             e.printStackTrace();
         }
+    }
+
+    public static String getMessageLink(EventContext ctx, String channel, String ts) {
+        return "https://" + ctx.getTeamId() + ".slack.com/archives/" + channel + "/p" + ts.replace(".", "");
     }
 }

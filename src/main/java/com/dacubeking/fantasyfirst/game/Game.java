@@ -2,11 +2,11 @@ package com.dacubeking.fantasyfirst.game;
 
 import com.dacubeking.fantasyfirst.Main;
 import com.slack.api.model.block.LayoutBlock;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.Serializable;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.slack.api.model.block.Blocks.*;
 import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
@@ -43,6 +43,7 @@ public class Game implements Serializable {
     private final String gameName;
     private boolean hasStarted = false;
     private long turnCount = 0;
+    private @Nullable List<String> lastMessagesTs;
 
     public Game(String channelId, int allianceSize, List<Team> teams, String gameOwnerSlackId, String gameName) {
         this.channelId = channelId;
@@ -175,7 +176,7 @@ public class Game implements Serializable {
                         markdownText(
                                 "*" + player.name() + "*: " +
                                         player.selectedTeams().stream().map(Team::name).collect(Collectors.joining(", ")
-                ))).collect(Collectors.toList())
+                                        ))).collect(Collectors.toList())
         ));
         // Get the next person in the draft order
         var nextPlayerInDraft = getNextPlayerInDraft();
@@ -185,7 +186,6 @@ public class Game implements Serializable {
                     table
             ));
         } else {
-            // Split the available teams into groups of no greater than 25 so that they can be displayed in slack
             var messages = new ArrayList<List<LayoutBlock>>();
             Main.pickTeamButton.setValue(getGameUuid().toString());
             messages.add(asBlocks(
@@ -279,5 +279,46 @@ public class Game implements Serializable {
 
     public long getTurnCount() {
         return turnCount;
+    }
+
+    public String getMarkdownTable() {
+        int longestTeamName = max(availableTeams.stream().map(Team::name).mapToInt(String::length).max().orElse(0),
+                4 + String.valueOf(allianceSize).length());
+        int longestName = max(players.stream().map(Player::name).mapToInt(String::length).max().orElse(0), 4);
+
+        String table = "";
+        table += "```";
+        table += "Name" + " ".repeat(longestName - 4) + " | ";
+        for (int i = 0; i < allianceSize; i++) {
+            table += "team" + (i + 1) + " ".repeat(longestTeamName - 5) + " | ";
+        }
+        table += "\n";
+
+        var divider = "-".repeat(table.length() - 5) + "\n";
+        table += divider;
+        for (var player : players) {
+            table += player.name + " ".repeat(longestName - player.name.length()) + " | ";
+            for (int i = 0; i < allianceSize; i++) {
+                if (player.selectedTeams().size() > i) {
+                    table += player.selectedTeams().get(i).name + " "
+                            .repeat(longestTeamName - player.selectedTeams().get(i).name.length()) + " | ";
+                } else {
+                    table += " ".repeat(longestTeamName) + " | ";
+                }
+            }
+            table += "\n";
+        }
+        table += divider;
+        table += "```";
+
+        return table;
+    }
+
+    public @Nullable List<String>  getLastMessagesTs() {
+        return lastMessagesTs;
+    }
+
+    public void setLastMessagesTs(@Nullable List<String> lastMessagesTs) {
+        this.lastMessagesTs = lastMessagesTs;
     }
 }

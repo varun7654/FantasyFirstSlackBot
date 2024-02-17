@@ -45,17 +45,19 @@ public class Game implements Serializable {
     private boolean hasStarted = false;
     private long turnCount = 0;
     private @Nullable List<String> lastMessagesTs;
-    private int maxPlayers = 0;
+    private int targetPlayersPerGame = 0;
 
     /**
      * Create a new game
-     * @param channelId The channel that the game is in
-     * @param allianceSize The number of teams that each player will pick
-     * @param teams The teams that are available to be picked
-     * @param gameOwnerSlackId The slack id of the person who created the game
-     * @param gameName The name of the game
      *
-     * NOTE: The max players is set to 0, meaning there is no limit to the number of players that can join the game
+     * @param channelId        The channel that the game is in
+     * @param allianceSize     The number of teams that each player will pick
+     * @param teams            The teams that are available to be picked
+     * @param gameOwnerSlackId The slack id of the person who created the game
+     * @param gameName         The name of the game
+     *                         <p>
+     *                         NOTE: The max players is set to 0, meaning there is no limit to the number of players that can join
+     *                         the game
      */
     public Game(String channelId, int allianceSize, List<Team> teams, String gameOwnerSlackId, String gameName) {
         this(channelId, allianceSize, teams, gameOwnerSlackId, gameName, 0);
@@ -63,21 +65,23 @@ public class Game implements Serializable {
 
     /**
      * Create a new game
-     * @param channelId The channel that the game is in
-     * @param allianceSize The number of teams that each player will pick
-     * @param teams The teams that are available to be picked
-     * @param gameOwnerSlackId The slack id of the person who created the game
-     * @param gameName The name of the game
-     * @param maxPlayers The maximum number of players that can be in the game. If 0, there is no limit
+     *
+     * @param channelId            The channel that the game is in
+     * @param allianceSize         The number of teams that each player will pick
+     * @param teams                The teams that are available to be picked
+     * @param gameOwnerSlackId     The slack id of the person who created the game
+     * @param gameName             The name of the game
+     * @param targetPlayersPerGame The maximum number of players that can be in the game. If 0, there is no limit
      */
-    public Game(String channelId, int allianceSize, List<Team> teams, String gameOwnerSlackId, String gameName, int maxPlayers) {
+    public Game(String channelId, int allianceSize, List<Team> teams, String gameOwnerSlackId, String gameName,
+                int targetPlayersPerGame) {
         this.channelId = channelId;
         this.allianceSize = allianceSize;
         this.availableTeams = new ArrayList<>(teams);
         this.gameOwnerSlackId = gameOwnerSlackId;
         this.gameName = gameName;
         availableTeams.sort(Comparator.comparingInt(o -> Integer.parseInt(o.number)));
-        this.maxPlayers = maxPlayers;
+        this.targetPlayersPerGame = targetPlayersPerGame;
     }
 
     public void addPlayer(Player player) {
@@ -133,7 +137,7 @@ public class Game implements Serializable {
     }
 
     public boolean isFull() {
-        return players.size() >= availableTeams.size() / allianceSize;
+        return !hasStarted() || (players.size() >= availableTeams.size() / allianceSize);
     }
 
     public String getGameOwnerSlackId() {
@@ -276,9 +280,10 @@ public class Game implements Serializable {
     }
 
     /**
-     * Pick a team for the next player in the draft. The next player in the draft is automatically determined by the game. It
-     * is imperative that calling code ensures that the game has not ended before calling this method.
-     * @param teamUuid  The UUID of the team to pick
+     * Pick a team for the next player in the draft. The next player in the draft is automatically determined by the game. It is
+     * imperative that calling code ensures that the game has not ended before calling this method.
+     *
+     * @param teamUuid The UUID of the team to pick
      * @return true if the team was picked, false if the team was not picked
      */
     public boolean pickTeam(UUID teamUuid) {
@@ -297,8 +302,9 @@ public class Game implements Serializable {
     }
 
     /**
-     * Pick a team for the next player in the draft. The next player in the draft is automatically determined by the game. It
-     * is imperative that calling code ensures that the game has not ended before calling this method.
+     * Pick a team for the next player in the draft. The next player in the draft is automatically determined by the game. It is
+     * imperative that calling code ensures that the game has not ended before calling this method.
+     *
      * @param teamNum The number of the team to pick
      */
     public void pickTeam(String teamNum) {
@@ -320,6 +326,7 @@ public class Game implements Serializable {
 
     /**
      * Get a markdown table of the current state of the draft
+     *
      * @return A markdown table of the current state of the draft
      */
     public String getMarkdownTable() {
@@ -355,7 +362,7 @@ public class Game implements Serializable {
         return table;
     }
 
-    public @Nullable List<String>  getLastMessagesTs() {
+    public @Nullable List<String> getLastMessagesTs() {
         return lastMessagesTs;
     }
 
@@ -366,15 +373,16 @@ public class Game implements Serializable {
 
     /**
      * Split the players into groups of maxPlayers
+     *
      * @return A list of lists of players, where each list of players is a group of players that will play together
      */
     @Contract(pure = true)
     public List<List<Player>> splitPlayers() {
-        if (maxPlayers > 0) {
+        if (targetPlayersPerGame > 0) {
             var playersCopy = new ArrayList<>(players);
 
             int actualMaxPlayers = availableTeams.size() / allianceSize;
-            int maxPlayers = Math.min(this.maxPlayers, actualMaxPlayers);
+            int maxPlayers = Math.min(this.targetPlayersPerGame, actualMaxPlayers);
 
             // Try to split the players into groups are so that the number of players in each group is as close to maxPlayers as possible
             // We are ok with going over maxPlayers, as long as we don't go over actualMaxPlayers.

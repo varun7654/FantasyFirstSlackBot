@@ -17,6 +17,7 @@ import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.block.composition.PlainTextObject;
 import com.slack.api.model.block.element.ButtonElement;
 import com.slack.api.model.event.AppHomeOpenedEvent;
+import com.slack.api.model.view.View;
 import com.slack.api.model.view.ViewState.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,7 +55,7 @@ public class Main {
 
 
     public static void main(String[] args) throws Exception {
-        try (FileInputStream fis = new FileInputStream("games.ser")){
+        try (FileInputStream fis = new FileInputStream("games.ser")) {
             ObjectInputStream ois = new ObjectInputStream(fis);
             Object object = ois.readObject();
             var gamesRead = (ConcurrentMap<String, ConcurrentMap<UUID, Game>>) object;
@@ -360,7 +361,7 @@ public class Main {
                     game.pickTeam(teamPickNumber);
                     var messageTs = new ArrayList<String>();
                     for (List<LayoutBlock> layoutBlocks : game.getDraftingMessage()) {
-                         messageTs.add(ctx.client().chatPostMessage(r -> r
+                        messageTs.add(ctx.client().chatPostMessage(r -> r
                                 .channel(game.getChannelId())
                                 .blocks(layoutBlocks)).getTs());
                     }
@@ -440,7 +441,7 @@ public class Main {
     }
 
     public static void save() {
-        try(FileOutputStream fos = new FileOutputStream("games.ser");) {
+        try (FileOutputStream fos = new FileOutputStream("games.ser");) {
             ObjectOutputStream oos = new ObjectOutputStream(fos);
             oos.writeObject(games);
             oos.close();

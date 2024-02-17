@@ -54,15 +54,19 @@ public class Main {
 
 
     public static void main(String[] args) throws Exception {
-        try {
-            FileInputStream fis = new FileInputStream("games.ser");
+        try (FileInputStream fis = new FileInputStream("games.ser")){
             ObjectInputStream ois = new ObjectInputStream(fis);
             Object object = ois.readObject();
             var gamesRead = (ConcurrentMap<String, ConcurrentMap<UUID, Game>>) object;
             games.putAll(gamesRead);
-        } catch (Exception e) {
+        } catch (FileNotFoundException e) {
             System.out.println("No save file found");
             e.printStackTrace();
+        } catch (ClassNotFoundException | ClassCastException e) {
+            System.out.println("Save file is corrupted");
+            throw new RuntimeException(e);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
 
         GetTeamsAtEvent getTeams = new GetTeamsAtEvent(Creds.TBA_API_KEY);
@@ -251,7 +255,7 @@ public class Main {
                 return Response.ok(ctx.respond("You need a player to start a game"));
             }
 
-            if (game.hasStarted() && false) {
+            if (game.hasStarted()) {
                 return Response.ok(ctx.respond("This game has already started"));
             } else {
                 game.start();
@@ -436,12 +440,10 @@ public class Main {
     }
 
     public static void save() {
-        try {
-            FileOutputStream fos = new FileOutputStream("games.ser");
+        try(FileOutputStream fos = new FileOutputStream("games.ser");) {
             ObjectOutputStream oos = new ObjectOutputStream(fos);
             oos.writeObject(games);
             oos.close();
-            fos.close();
         } catch (Exception e) {
             System.out.println("Error saving");
             e.printStackTrace();

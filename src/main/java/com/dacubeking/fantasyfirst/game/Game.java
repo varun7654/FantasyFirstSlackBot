@@ -2,6 +2,7 @@ package com.dacubeking.fantasyfirst.game;
 
 import com.dacubeking.fantasyfirst.Main;
 import com.slack.api.model.block.LayoutBlock;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.Serializable;
@@ -17,7 +18,7 @@ import static java.lang.Math.max;
 
 public class Game implements Serializable {
 
-    public static final long serialVersionUID = -8421916417899141622L;
+    private static final long serialVersionUID = -8421916417899141622L;
 
     public record Team(String name, String number, String elo, UUID uuid) implements Serializable {
         public Team(String number) {
@@ -44,14 +45,39 @@ public class Game implements Serializable {
     private boolean hasStarted = false;
     private long turnCount = 0;
     private @Nullable List<String> lastMessagesTs;
+    private int maxPlayers = 0;
 
+    /**
+     * Create a new game
+     * @param channelId The channel that the game is in
+     * @param allianceSize The number of teams that each player will pick
+     * @param teams The teams that are available to be picked
+     * @param gameOwnerSlackId The slack id of the person who created the game
+     * @param gameName The name of the game
+     *
+     * NOTE: The max players is set to 0, meaning there is no limit to the number of players that can join the game
+     */
     public Game(String channelId, int allianceSize, List<Team> teams, String gameOwnerSlackId, String gameName) {
+        this(channelId, allianceSize, teams, gameOwnerSlackId, gameName, 0);
+    }
+
+    /**
+     * Create a new game
+     * @param channelId The channel that the game is in
+     * @param allianceSize The number of teams that each player will pick
+     * @param teams The teams that are available to be picked
+     * @param gameOwnerSlackId The slack id of the person who created the game
+     * @param gameName The name of the game
+     * @param maxPlayers The maximum number of players that can be in the game. If 0, there is no limit
+     */
+    public Game(String channelId, int allianceSize, List<Team> teams, String gameOwnerSlackId, String gameName, int maxPlayers) {
         this.channelId = channelId;
         this.allianceSize = allianceSize;
         this.availableTeams = new ArrayList<>(teams);
         this.gameOwnerSlackId = gameOwnerSlackId;
         this.gameName = gameName;
         availableTeams.sort(Comparator.comparingInt(o -> Integer.parseInt(o.number)));
+        this.maxPlayers = maxPlayers;
     }
 
     public void addPlayer(Player player) {
@@ -249,6 +275,12 @@ public class Game implements Serializable {
         }
     }
 
+    /**
+     * Pick a team for the next player in the draft. The next player in the draft is automatically determined by the game. It
+     * is imperative that calling code ensures that the game has not ended before calling this method.
+     * @param teamUuid  The UUID of the team to pick
+     * @return true if the team was picked, false if the team was not picked
+     */
     public boolean pickTeam(UUID teamUuid) {
         for (var team : availableTeams) {
             if (team.uuid().equals(teamUuid)) {
@@ -264,6 +296,11 @@ public class Game implements Serializable {
         return false;
     }
 
+    /**
+     * Pick a team for the next player in the draft. The next player in the draft is automatically determined by the game. It
+     * is imperative that calling code ensures that the game has not ended before calling this method.
+     * @param teamNum The number of the team to pick
+     */
     public void pickTeam(String teamNum) {
         for (var team : availableTeams) {
             if (team.number.equals(teamNum)) {
@@ -281,6 +318,10 @@ public class Game implements Serializable {
         return turnCount;
     }
 
+    /**
+     * Get a markdown table of the current state of the draft
+     * @return A markdown table of the current state of the draft
+     */
     public String getMarkdownTable() {
         int longestTeamName = max(availableTeams.stream().map(Team::name).mapToInt(String::length).max().orElse(0),
                 4 + String.valueOf(allianceSize).length());
@@ -318,7 +359,45 @@ public class Game implements Serializable {
         return lastMessagesTs;
     }
 
+
     public void setLastMessagesTs(@Nullable List<String> lastMessagesTs) {
         this.lastMessagesTs = lastMessagesTs;
+    }
+
+    /**
+     * Split the players into groups of maxPlayers
+     * @return A list of lists of players, where each list of players is a group of players that will play together
+     */
+    @Contract(pure = true)
+    public List<List<Player>> splitPlayers() {
+        if (maxPlayers > 0) {
+            var playersCopy = new ArrayList<>(players);
+
+            int actualMaxPlayers = availableTeams.size() / allianceSize;
+            int maxPlayers = Math.min(this.maxPlayers, actualMaxPlayers);
+
+            // Try to split the players into groups are so that the number of players in each group is as close to maxPlayers as possible
+            // We are ok with going over maxPlayers, as long as we don't go over actualMaxPlayers.
+
+            int numGroups = (int) Math.round((double) playersCopy.size() / maxPlayers);
+
+            int playersPerGroup = (int) Math.ceil((double) playersCopy.size() / numGroups);
+            if (playersPerGroup > actualMaxPlayers) {
+                playersPerGroup = actualMaxPlayers;
+                numGroups++;
+            }
+
+            List<List<Player>> splitPlayers = new ArrayList<>();
+
+            Collections.shuffle(playersCopy);
+
+            for (int i = 0; i < numGroups; i++) {
+                int start = i * playersPerGroup;
+                int end = Math.min((i + 1) * playersPerGroup, playersCopy.size());
+                splitPlayers.add(playersCopy.subList(start, end));
+            }
+            return splitPlayers;
+        }
+        return List.of(players);
     }
 }

@@ -137,7 +137,7 @@ public class Game implements Serializable {
     }
 
     public boolean isFull() {
-        return !hasStarted() || (players.size() >= availableTeams.size() / allianceSize);
+        return hasStarted() && (players.size() >= getActualMaxPlayers());
     }
 
     public String getGameOwnerSlackId() {
@@ -172,11 +172,6 @@ public class Game implements Serializable {
                 '}';
     }
 
-    // Help me write a message that allows users to register for the game. The message should say: "A Fantasy First Game has
-    // been created" and then list out the teams that are available to be selected. The message should also have a button
-    // that says "Join Game". When the user clicks the button, they should be added to the game. There should also be a "Leave
-    // Game" button that removes the user from the game. The message should also have a button that says "Start Game". When
-    // the user clicks the button, the game should start.
 
     public List<LayoutBlock> getGameRegistrationMessage() {
 
@@ -194,7 +189,11 @@ public class Game implements Serializable {
                 divider(),
                 section(section -> section.text(markdownText("Players:"))),
                 section(section -> section.text(plainText(finalPlayersString))),
-                getJoiningButtons()
+                getJoiningButtons(),
+                context(context -> context.elements(
+                        List.of(markdownText("This game will be split into multiple drafts with " +
+                                (targetPlayersPerGame == 0 ? getActualMaxPlayers() : targetPlayersPerGame)
+                                + " players per draft"))))
         );
     }
 
@@ -371,6 +370,18 @@ public class Game implements Serializable {
         this.lastMessagesTs = lastMessagesTs;
     }
 
+    public int getTeamsPerAlliance() {
+        return allianceSize;
+    }
+
+    public List<Team> getTeams() {
+        return availableTeams;
+    }
+
+    public int getActualMaxPlayers() {
+        return availableTeams.size() / allianceSize;
+    }
+
     /**
      * Split the players into groups of maxPlayers
      *
@@ -381,7 +392,7 @@ public class Game implements Serializable {
         if (targetPlayersPerGame > 0) {
             var playersCopy = new ArrayList<>(players);
 
-            int actualMaxPlayers = availableTeams.size() / allianceSize;
+            int actualMaxPlayers = getActualMaxPlayers();
             int maxPlayers = Math.min(this.targetPlayersPerGame, actualMaxPlayers);
 
             // Try to split the players into groups are so that the number of players in each group is as close to maxPlayers as possible

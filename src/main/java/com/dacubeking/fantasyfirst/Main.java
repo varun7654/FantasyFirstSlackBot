@@ -17,7 +17,6 @@ import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.block.composition.PlainTextObject;
 import com.slack.api.model.block.element.ButtonElement;
 import com.slack.api.model.event.AppHomeOpenedEvent;
-import com.slack.api.model.view.View;
 import com.slack.api.model.view.ViewState.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -259,14 +258,33 @@ public class Main {
             if (game.hasStarted()) {
                 return Response.ok(ctx.respond("This game has already started"));
             } else {
-                game.start();
-                var messageTs = new ArrayList<String>();
-                for (List<LayoutBlock> layoutBlocks : game.getDraftingMessage()) {
-                    messageTs.add(ctx.client().chatPostMessage(r -> r
-                            .channel(game.getChannelId())
-                            .blocks(layoutBlocks)).getTs());
+                var splitPlayers = game.splitPlayers();
+
+                game.getPlayers().clear();
+                game.getPlayers().addAll(splitPlayers.get(0));
+                List<Game> gamesFromThisGame = new ArrayList<>();
+                gamesFromThisGame.add(game);
+
+
+                for (int i = 1; i < splitPlayers.size() - 1; i++) {
+                    var newGame = new Game(game.getChannelId(), game.getTeamsPerAlliance(), game.getTeams(),
+                            game.getGameOwnerSlackId(), game.getGameName() + " " + (i + 1));
+                    newGame.getPlayers().addAll(splitPlayers.get(1));
+                    gamesFromThisGame.add(newGame);
+                    games.get(ctx.getTeamId()).put(newGame.getGameUuid(), newGame);
                 }
-                game.setLastMessagesTs(messageTs);
+
+
+                for (Game gameFromThisGame : gamesFromThisGame) {
+                    gameFromThisGame.start();
+                    var messageTs = new ArrayList<String>();
+                    for (List<LayoutBlock> layoutBlocks : gameFromThisGame.getDraftingMessage()) {
+                        messageTs.add(ctx.client().chatPostMessage(r -> r
+                                .channel(gameFromThisGame.getChannelId())
+                                .blocks(layoutBlocks)).getTs());
+                    }
+                    gameFromThisGame.setLastMessagesTs(messageTs);
+                }
             }
             save();
 

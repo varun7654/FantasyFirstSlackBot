@@ -177,10 +177,6 @@ public class Main {
                 teams = getTeams.getTeamsAtEvent(teamListValue);
             }
 
-            if (gameName.trim().endsWith("Draft")) {
-                gameName = gameName.trim().substring(0, gameName.trim().length() - 5);
-            }
-
             var game = new Game(selectedChannel, teamsPerAllianceValue, teams, ctx.getRequestUserId(), gameName);
             games.putIfAbsent(ctx.getTeamId(), new ConcurrentHashMap<>());
             games.get(ctx.getTeamId()).put(game.getGameUuid(), game);

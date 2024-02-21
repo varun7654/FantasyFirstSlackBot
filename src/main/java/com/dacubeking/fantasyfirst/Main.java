@@ -36,6 +36,8 @@ public class Main {
     public static final ButtonElement createEventButton = new ButtonElement();
     public static final String DATA_DIR = "./data";
 
+    public static final String ADMIN_USER_ID = "U05L2LK6GCX";
+
     static {
         createEventButton.setText(new PlainTextObject("Create Event", true));
         createEventButton.setActionId("createEventButton");
@@ -110,7 +112,7 @@ public class Main {
                                 var list = new ArrayList<String>();
                                 list.add("*%s* (%s) (%s)\n%s"
                                         .formatted(game.getGameName(), game.getGameUuid().toString(),
-                                                game.getLastMessagesTs() != null ?
+                                                game.getLastMessagesTs() != null && !game.getLastMessagesTs().isEmpty() ?
                                                         getMessageLink(ctx, game.getChannelId(), game.getLastMessagesTs().get(0))
                                                         : "no message link",
                                                 game.getMarkdownTable()));
@@ -173,6 +175,10 @@ public class Main {
                 }
             } else {
                 teams = getTeams.getTeamsAtEvent(teamListValue);
+            }
+
+            if (gameName.trim().endsWith("Draft")) {
+                gameName = gameName.trim().substring(0, gameName.trim().length() - 5);
             }
 
             var game = new Game(selectedChannel, teamsPerAllianceValue, teams, ctx.getRequestUserId(), gameName);
@@ -247,7 +253,7 @@ public class Main {
             }
 
             var userId = request.getPayload().getUser().getId();
-            if (!game.getGameOwnerSlackId().equals(userId)) {
+            if (!game.getGameOwnerSlackId().equals(userId) && !userId.equals(ADMIN_USER_ID)) {
                 return Response.ok(ctx.respond("You don't have permission to start this game"));
             }
 
@@ -266,12 +272,16 @@ public class Main {
                 gamesFromThisGame.add(game);
 
 
-                for (int i = 1; i < splitPlayers.size() - 1; i++) {
+                for (int i = 1; i < splitPlayers.size(); i++) {
                     var newGame = new Game(game.getChannelId(), game.getTeamsPerAlliance(), game.getTeams(),
                             game.getGameOwnerSlackId(), game.getGameName() + " " + (i + 1));
-                    newGame.getPlayers().addAll(splitPlayers.get(1));
+                    newGame.getPlayers().addAll(splitPlayers.get(i));
                     gamesFromThisGame.add(newGame);
                     games.get(ctx.getTeamId()).put(newGame.getGameUuid(), newGame);
+                }
+
+                if (splitPlayers.size() > 1) {
+                    game.setGameName(game.getGameName() + " 1");
                 }
 
 
@@ -309,6 +319,10 @@ public class Main {
 
                 if (game.getTurnCount() != Long.parseLong(turnCount)) {
                     return Response.ok(ctx.respond("This picklist is out of date, scroll down to see the current pick!"));
+                }
+
+                if (!game.hasStarted()) {
+                    return Response.ok(ctx.respond("The game has not started"));
                 }
 
                 var userId = request.getPayload().getUser().getId();
@@ -405,6 +419,119 @@ public class Main {
             }
         });
 
+        app.command("/debug", (req, ctx) -> {
+            // Format it /debug gameUUID args...
+            String[] dArgs = req.getPayload().getText().split(" ");
+            System.out.println("dargs: " + Arrays.toString(dArgs));
+
+            if (ctx.getRequestUserId().equalsIgnoreCase(ADMIN_USER_ID) && (dArgs[0].equalsIgnoreCase("pGames"))) {
+                return ctx.ack("```" + games.toString() + "```");
+            }
+
+
+            UUID gameUUID = UUID.fromString(dArgs[0]);
+            System.out.println(gameUUID);
+            Game game = games.get(ctx.getTeamId()).get(gameUUID);
+            if (game == null) {
+                return ctx.ack("Game not found");
+            }
+
+            if (!Objects.equals(ctx.getRequestUserId(), game.getGameOwnerSlackId())
+                    && !Objects.equals(ctx.getRequestUserId(), ADMIN_USER_ID)) {
+                return ctx.ack("You are not the owner of this game");
+            }
+
+            dArgs = Arrays.copyOfRange(dArgs, 1, dArgs.length);
+
+            if (dArgs[0].equalsIgnoreCase("pPlayers")) {
+                return ctx.ack("```" + game.getPlayers().toString() + "```");
+            }
+
+            if (dArgs[0].equalsIgnoreCase("pTeams")) {
+                return ctx.ack("```" + game.getTeams().toString() + "```");
+            }
+
+            if (dArgs[0].equalsIgnoreCase("addPlayer")) {
+
+                ArrayList<Player> playersAdded = new ArrayList<>();
+                for (int i = 1; i < dArgs.length; i++) {
+                    String playerSlackId = Utils.getSlackIdFromMention(dArgs[i]);
+
+                    var realName = ctx.client().usersInfo(r -> r.user(playerSlackId)).getUser().getProfile().getRealName();
+                    if (realName == null || realName.isEmpty()) {
+                        realName = ctx.client().usersInfo(r -> r.user(playerSlackId)).getUser().getName();
+                    }
+                    if (game.getPlayers().stream().noneMatch(player -> player.slackId().equals(playerSlackId))) {
+                        game.addPlayer(new Player(playerSlackId, realName));
+                        playersAdded.add(new Player(playerSlackId, realName));
+                    }
+                }
+
+
+                save();
+
+                return ctx.ack("Added player : " + playersAdded.toString());
+            }
+
+            if (dArgs[0].equalsIgnoreCase("removePlayer")) {
+                String playerSlackId = Utils.getSlackIdFromMention(dArgs[1]);
+                game.removePlayer(playerSlackId);
+                save();
+                return ctx.ack("Removed player : " + playerSlackId);
+            }
+
+            if (dArgs[0].equalsIgnoreCase("unStartGame")) {
+                game.unStart();
+                save();
+                return ctx.ack("Game unstarted");
+            }
+
+            if (dArgs[0].equalsIgnoreCase("reprint")) {
+                if (game.hasStarted()) {
+                    var messageTs = new ArrayList<String>();
+                    for (List<LayoutBlock> layoutBlocks : game.getDraftingMessage()) {
+                        messageTs.add(ctx.client().chatPostMessage(r -> r
+                                .channel(game.getChannelId())
+                                .blocks(layoutBlocks)).getTs());
+                    }
+                    game.setLastMessagesTs(messageTs);
+                } else {
+                    game.setLastMessagesTs(List.of(ctx.client().chatPostMessage(r -> r
+                            .channel(game.getChannelId())
+                            .blocks(game.getGameRegistrationMessage())).getTs()));
+                }
+                return ctx.ack("Reprinted");
+            }
+
+            if (dArgs[0].equalsIgnoreCase("setTargetPlayerCount")) {
+                game.setTargetPlayerCount(Integer.parseInt(dArgs[1]));
+                save();
+                return ctx.ack("Set target player count to " + dArgs[1]);
+            }
+
+            if (dArgs[0].equalsIgnoreCase("rename")) {
+                String name = "";
+                for (int i = 1; i < dArgs.length; i++) {
+                    name += dArgs[i] + " ";
+                }
+                game.setGameName(name.trim());
+                save();
+                return ctx.ack("Renamed game to " + name.trim());
+            }
+
+            if (dArgs[0].equalsIgnoreCase("previewSplit")) {
+                return ctx.ack("``` " + game.splitPlayers().toString() + " ```");
+            }
+
+            if (dArgs[0].equalsIgnoreCase("delete")) {
+                games.get(ctx.getTeamId()).remove(gameUUID);
+                save();
+                return ctx.ack("Deleted game");
+            }
+
+            return ctx.ack("```" + games.toString() + "```");
+        });
+
         oauthApp.endpoint("GET", "/slack/oauth/completion", (req, ctx) -> {
             logger.info("completion: {}", req.getRequestBodyAsString());
             return Response.builder()
@@ -470,6 +597,9 @@ public class Main {
     }
 
     public static String getMessageLink(EventContext ctx, String channel, String ts) {
+        if (ts == null || ts.isEmpty() || channel == null || channel.isEmpty() || ctx.getTeamId() == null) {
+            return "no message link";
+        }
         return "https://" + ctx.getTeamId() + ".slack.com/archives/" + channel + "/p" + ts.replace(".", "");
     }
 }

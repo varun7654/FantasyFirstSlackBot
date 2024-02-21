@@ -20,6 +20,10 @@ public class Game implements Serializable {
 
     private static final long serialVersionUID = -8421916417899141622L;
 
+    public void setTargetPlayerCount(int i) {
+        targetPlayersPerGame = i;
+    }
+
     public record Team(String name, String number, String elo, UUID uuid) implements Serializable {
         public Team(String number) {
             this(number, number, "0", UUID.randomUUID());
@@ -41,7 +45,7 @@ public class Game implements Serializable {
     private final UUID uuid = UUID.randomUUID();
 
     private final String gameOwnerSlackId;
-    private final String gameName;
+    private String gameName;
     private boolean hasStarted = false;
     private long turnCount = 0;
     private @Nullable List<String> lastMessagesTs;
@@ -160,6 +164,19 @@ public class Game implements Serializable {
         hasStarted = true;
     }
 
+    public void unStart() {
+        hasStarted = false;
+
+        for (Player player : players) {
+            availableTeams.addAll(player.selectedTeams);
+            player.selectedTeams.clear();
+        }
+    }
+
+    public void setGameName(String name) {
+        gameName = name;
+    }
+
     @Override
     public String toString() {
         return "Game{" +
@@ -218,7 +235,7 @@ public class Game implements Serializable {
             var messages = new ArrayList<List<LayoutBlock>>();
             Main.pickTeamButton.setValue(getGameUuid().toString());
             messages.add(asBlocks(
-                    section(section -> section.text(markdownText("*" + getGameName() + " Draft:*"))),
+                    section(section -> section.text(markdownText("*" + getGameName() + ":*"))),
                     section(section -> section.text(markdownText("It is <@" + nextPlayerInDraft.slackId()
                             + ">'s turn to pick a team"))),
                     table,
@@ -389,9 +406,9 @@ public class Game implements Serializable {
      */
     @Contract(pure = true)
     public List<List<Player>> splitPlayers() {
-        if (targetPlayersPerGame > 0) {
-            var playersCopy = new ArrayList<>(players);
+        var playersCopy = new ArrayList<>(players);
 
+        if (targetPlayersPerGame > 0) {
             int actualMaxPlayers = getActualMaxPlayers();
             int maxPlayers = Math.min(this.targetPlayersPerGame, actualMaxPlayers);
 
@@ -417,6 +434,6 @@ public class Game implements Serializable {
             }
             return splitPlayers;
         }
-        return List.of(players);
+        return List.of(playersCopy);
     }
 }

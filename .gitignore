@@ -41,7 +41,4 @@ bin/
 ### Mac OS ###
 .DS_Store
 *.ser
-src/main/java/com/dacubeking/fantasyfirst/Creds.java
-deploy.sh
-deploy.ps1
-deploy.sh
+deploy.properties

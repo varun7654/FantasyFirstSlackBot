@@ -91,7 +91,7 @@ public class Main {
                 .redirectUri("https://dacubeking.com/slack/oauth/completion")
                 .scope("chat:write,chat:write.public,users:read,users.profile:read")
                 .appPath("/slack/oauth/start")
-                .oauthCallbackPath("/slack/oauth/callback")
+                .oauthRedirectUriPath("/slack/oauth/callback")
                 .oauthCancellationUrl("https://dacubeking.com/slack/oauth/cancellation")
                 .oauthCompletionUrl("https://dacubeking.com/slack/oauth/completion")
                 .build()).asOAuthApp(true);
@@ -575,9 +575,6 @@ public class Main {
     }
 
     public static SlackApiResponse print(SlackApiResponse response) {
-        if (!response.isOk()) {
-            logger.warn(response.toString());
-        }
         return response;
     }
 

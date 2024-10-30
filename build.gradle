@@ -18,11 +18,10 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
 
-    implementation("com.slack.api:bolt:1.1.+")
-    implementation("com.slack.api:bolt-servlet:1.1.+")
-    implementation("com.slack.api:bolt-jetty:1.1.+")
-
-    implementation 'org.slf4j:slf4j-simple:2.0.9'
+    implementation("com.slack.api:bolt:1.44.1")
+    implementation("com.slack.api:bolt-servlet:1.44.1")
+    implementation("com.slack.api:bolt-jetty:1.44.1")
+    implementation("org.slf4j:slf4j-simple:1.7.36")
 //    implementation("com.google.guava:guava:32.1.2-jre")
 //    implementation 'org.apache.commons:collections4:3.6'
 }
@@ -30,6 +29,78 @@ dependencies {
 test {
     useJUnitPlatform()
 }
+
+
+// Load properties from deploy.properties file
+def loadProperties() {
+    def properties = new Properties()
+    file("deploy.properties").withInputStream { properties.load(it) }
+    return properties
+}
+
+def deployProperties = loadProperties()
+
+task deploy {
+    group = "Deployment"
+    description = "Builds the JAR, SSHs into the server, stops any running bot instance, copies the new JAR, and restarts the bot in a screen session."
+
+    dependsOn shadowJar
+
+    doLast {
+        def server = deployProperties['server.address']
+        def username = deployProperties['server.username']
+        def projectName = deployProperties['project.name']
+        def remoteDir = deployProperties['remote.dir']
+        def screenName = deployProperties['screen.name']
+        def jarName = tasks.shadowJar.archiveFileName.get()  // Automatically get JAR name
+
+        def sshStopCommand = """
+          echo "Stopping any running instances of ${projectName}...";
+          PID=\$(pgrep -f "${projectName}");
+          if [[ -n "\$PID" ]]; then
+            kill -9 "\$PID";
+            echo "Stopped process \$PID.";
+          else
+            echo "No running instance found.";
+          fi
+        """
+
+        def sshStartCommand = """
+          echo "Starting ${projectName} in a new screen session...";
+          source ${remoteDir}/setenv.sh;
+          screen -dmS "${screenName}" java -jar "${remoteDir}/${jarName}";
+          echo "${projectName} started successfully.";
+        """
+
+        def execAndPrint = { command ->
+            def output = new ByteArrayOutputStream()
+            def errorOutput = new ByteArrayOutputStream()
+            exec {
+                commandLine command
+                standardOutput = output
+                errorOutput = errorOutput
+                ignoreExitValue = true
+            }
+            println output.toString()
+            println errorOutput.toString()
+        }
+
+        // Copy JAR to the server
+        println "Copying JAR to the server..."
+        execAndPrint(['scp', "build/libs/${jarName}", "${username}@${server}:${remoteDir}/${jarName}"])
+
+        // SSH into the server to stop the process
+        println "Stopping the current bot instance (if any)..."
+        execAndPrint(['ssh', "${username}@${server}", sshStopCommand])
+
+        // SSH into the server to start the new process
+        println "Starting the bot in a new screen session..."
+        execAndPrint(['ssh', "${username}@${server}", sshStartCommand])
+
+        println "Deployment completed!"
+    }
+}
+
 
 jar {
     manifest {

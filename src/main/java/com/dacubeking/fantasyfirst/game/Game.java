@@ -40,8 +40,8 @@ public class Game implements Serializable {
 
     private final ArrayList<Player> players = new ArrayList<>();
 
-    private final String channelId;
-    private final int allianceSize;
+    private String channelId;
+    private int allianceSize;
     private final UUID uuid = UUID.randomUUID();
 
     private final String gameOwnerSlackId;
@@ -131,6 +131,9 @@ public class Game implements Serializable {
     public int getAllianceSize() {
         return allianceSize;
     }
+    public void setAllianceSize(int size) {
+        this.allianceSize = size;
+    }
 
     public List<Team> getAvailableTeams() {
         return availableTeams;
@@ -180,15 +183,19 @@ public class Game implements Serializable {
     @Override
     public String toString() {
         return "Game{" +
-                "availableTeams=" + availableTeams +
+                "gameName='" + gameName + '\'' +
+                ", lastMessagesTs=" + lastMessagesTs +
+                ", availableTeams=" + availableTeams +
                 ", players=" + players +
                 ", channelId='" + channelId + '\'' +
                 ", allianceSize=" + allianceSize +
                 ", uuid=" + uuid +
                 ", gameOwnerSlackId='" + gameOwnerSlackId + '\'' +
+                ", hasStarted=" + hasStarted +
+                ", turnCount=" + turnCount +
+                ", targetPlayersPerGame=" + targetPlayersPerGame +
                 '}';
     }
-
 
     public List<LayoutBlock> getGameRegistrationMessage() {
 

@@ -83,7 +83,7 @@ public class Screens {
             			"element": {
             				"type": "number_input",
             				"is_decimal_allowed": false,
-            				"action_id": "teams_per_alliance"
+            				"action_id": "target_player_count_per_game"
             			}
             		},
             		{

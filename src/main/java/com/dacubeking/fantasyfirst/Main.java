@@ -157,6 +157,8 @@ public class Main {
             String selectedChannel = extractValueByElementName(values, "channel").orElseThrow().getSelectedChannel();
             int teamsPerAllianceValue = Integer.parseInt(extractValueByElementName(values, "teams_per_alliance").orElseThrow()
                     .getValue());
+            int targetPlayerCountPerGame = Integer.parseInt(extractValueByElementName(values, "target_player_count_per_game")
+                    .orElseThrow().getValue());
             String gameName = extractValueByElementName(values, "event_name").orElseThrow().getValue();
 
             List<Team> teams;
@@ -176,7 +178,7 @@ public class Main {
                 teams = getTeams.getTeamsAtEvent(teamListValue);
             }
 
-            var game = new Game(selectedChannel, teamsPerAllianceValue, teams, ctx.getRequestUserId(), gameName);
+            var game = new Game(selectedChannel, teamsPerAllianceValue, teams, ctx.getRequestUserId(), gameName, targetPlayerCountPerGame);
             games.putIfAbsent(ctx.getTeamId(), new ConcurrentHashMap<>());
             games.get(ctx.getTeamId()).put(game.getGameUuid(), game);
 
@@ -437,6 +439,22 @@ public class Main {
             }
 
             dArgs = Arrays.copyOfRange(dArgs, 1, dArgs.length);
+
+            if (dArgs[0].equalsIgnoreCase("p")) {
+                return ctx.ack("```" + game + "```");
+            }
+
+            if (dArgs[0].equalsIgnoreCase("set")) {
+                if (dArgs[1].equalsIgnoreCase("targetPlayerCount")){
+                    game.setTargetPlayerCount(Integer.parseInt(dArgs[2]));
+                    return ctx.ack("```" + game + "```");
+
+                }
+                if (dArgs[1].equalsIgnoreCase("allianceSize")){
+                    game.setAllianceSize(Integer.parseInt(dArgs[2]));
+                    return ctx.ack("```" + game + "```");
+                }
+            }
 
             if (dArgs[0].equalsIgnoreCase("pPlayers")) {
                 return ctx.ack("```" + game.getPlayers().toString() + "```");

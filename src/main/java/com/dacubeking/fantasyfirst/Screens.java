@@ -1,5 +1,15 @@
 package com.dacubeking.fantasyfirst;
 
+import com.slack.api.model.view.View;
+import com.slack.api.model.view.ViewClose;
+import com.slack.api.model.view.ViewSubmit;
+import com.slack.api.model.view.ViewTitle;
+
+import static com.slack.api.model.block.Blocks.*;
+import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
+import static com.slack.api.model.block.composition.BlockCompositions.plainText;
+import static com.slack.api.model.block.element.BlockElements.*;
+
 public class Screens {
     public static final String CREATE_EVENT_CALLBACK_ID = "createEventButton";
     public static final String CREATE_EVENT = """
@@ -179,4 +189,56 @@ public class Screens {
             	]
             }
             """; // .formatted(player.slackId(), teamsString);
+
+
+    public static View buildPickATeamErrorView(String callbackId, String playerSlackId, String teamsString, String errorMessage) {
+        return View.builder()
+                .type("modal")
+                .callbackId(callbackId)
+                .title(ViewTitle.builder().text("Pick A Team").emoji(true).build())
+                .submit(ViewSubmit.builder().text("Submit Pick").emoji(true).build())
+                .close(ViewClose.builder().text("Cancel").emoji(true).build())
+                .blocks(asBlocks(
+                        divider(),
+                        section(section -> section
+                                .blockId("sectionBlockOnlyMrkdwn")
+                                .text(markdownText("*It's " + playerSlackId + "'s turn to pick!*"))
+                        ),
+                        divider(),
+                        context(ctx -> ctx
+                                .elements(asContextElements(
+                                        markdownText("*Available Teams:*")
+                                ))
+                        ),
+                        context(ctx -> ctx
+                                .elements(asContextElements(
+                                        plainText(pt -> pt.text(teamsString).emoji(true))
+                                ))
+                        ),
+                        input(input -> input
+                                .label(plainText(pt -> pt.text("Enter your pick (e.g 254)").emoji(true)))
+                                .element(numberInput(inputElement -> inputElement
+                                        .actionId("team_pick_number").
+                                        decimalAllowed(false)
+                                ))
+                        ),
+                        context(ctx -> ctx
+                                .elements(asContextElements(
+                                        imageElement(img -> img
+                                                .imageUrl("https://api.slack.com/img/blocks/bkb_template_images/notificationsWarningIcon.png")
+                                                .altText("notifications warning icon")
+                                        ),
+                                        markdownText("*" + errorMessage + "*")
+                                ))
+                        ),
+                        section(section -> section
+                                .blockId("sectionBlockOnlyPlainText")
+                                .text(plainText(pt -> pt
+                                        .text("If you're not able to submit this form check that you've entered a valid team & that it's your turn to pick")
+                                        .emoji(true)
+                                ))
+                        )
+                ))
+                .build();
+    }
 }

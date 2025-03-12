@@ -1,6 +1,7 @@
 package com.dacubeking.fantasyfirst.game;
 
 import com.dacubeking.fantasyfirst.Main;
+import com.slack.api.model.Option;
 import com.slack.api.model.block.LayoutBlock;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
@@ -330,7 +331,7 @@ public class Game implements Serializable {
      *
      * @param teamNum The number of the team to pick
      */
-    public void pickTeam(String teamNum) {
+    public Optional<Team> pickTeam(String teamNum) {
         for (var team : availableTeams) {
             if (team.number.equals(teamNum)) {
                 var nextPlayerInDraft = getNextPlayerInDraft();
@@ -338,9 +339,10 @@ public class Game implements Serializable {
                     nextPlayerInDraft.selectedTeams.add(team);
                     availableTeams.remove(team);
                 }
-                return;
+                return Optional.of(team);
             }
         }
+        return Optional.empty();
     }
 
     public long getTurnCount() {

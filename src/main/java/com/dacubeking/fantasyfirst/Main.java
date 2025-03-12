@@ -3,6 +3,7 @@ package com.dacubeking.fantasyfirst;
 import com.dacubeking.fantasyfirst.game.Game;
 import com.dacubeking.fantasyfirst.game.Game.Player;
 import com.dacubeking.fantasyfirst.game.Game.Team;
+import com.slack.api.app_backend.views.response.ViewSubmissionResponse;
 import com.slack.api.bolt.App;
 import com.slack.api.bolt.AppConfig;
 import com.slack.api.bolt.context.builtin.ActionContext;
@@ -19,6 +20,7 @@ import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.block.composition.PlainTextObject;
 import com.slack.api.model.block.element.ButtonElement;
 import com.slack.api.model.event.AppHomeOpenedEvent;
+import com.slack.api.model.view.View;
 import com.slack.api.model.view.ViewState.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -360,7 +362,12 @@ public class Main {
                     return Response.ok(ctx.respond("The draft is over"));
                 }
 
+                if (!turnToPick.slackId().equals(blockActionRequest.getContext().getRequestUserId())) {
+                    return Response.ok(ctx.respond("It is not your turn to pick"));
+                }
+
                 var teamsString = availableTeams.stream().map(Team::number).collect(Collectors.joining(", "));
+
 
                 print(ctx.client().viewsOpen(viewsOpenRequestBuilder ->
                         viewsOpenRequestBuilder.viewAsString(
@@ -385,9 +392,23 @@ public class Main {
                 var game = games.get(teamId).get(gameId);
                 var userId = viewSubmissionRequest.getPayload().getUser().getId();
 
+                var teamsString = game.getAvailableTeams().stream().map(Team::number).collect(Collectors.joining(", "));
+
+
                 var nextPlayerInDraft = game.getNextPlayerInDraft();
                 if (nextPlayerInDraft != null && nextPlayerInDraft.slackId().equals(userId)) {
-                    game.pickTeam(teamPickNumber);
+                    var teamPicked = game.pickTeam(teamPickNumber);
+                    if (teamPicked.isEmpty()) {
+                        return ctx.ack("update", Screens.buildPickATeamErrorView(
+                                Screens.PICK_TEAM_CALLBACK_ID + "," + gameId.toString(),
+                                "<@" + nextPlayerInDraft.slackId() + ">",
+                                teamsString,
+                                "You chose a team that isn't available to pick!"
+                                ));
+                    }
+                    var team = teamPicked.get();
+                    String pickerName = nextPlayerInDraft.name();
+
                     var messageTs = new ArrayList<String>();
                     for (List<LayoutBlock> layoutBlocks : game.getDraftingMessage()) {
                         messageTs.add(ctx.client().chatPostMessage(r -> r
@@ -396,23 +417,32 @@ public class Main {
                     }
 
                     if (game.getLastMessagesTs() != null) {
-                        for (String s : game.getLastMessagesTs()) {
+                        if (!game.getLastMessagesTs().isEmpty()) {
+                            ctx.client().chatUpdate(r -> r
+                                    .channel(game.getChannelId())
+                                    .ts(game.getLastMessagesTs().get(0))
+                                    .blocks(asBlocks(section(section -> section.text(
+                                            markdownText("*" + pickerName +   "* picked " + team.name()
+                                            )))))
+                            );
+                        }
+
+                        for (int i = 1; i < game.getLastMessagesTs().size(); i++) {
+                            var s = game.getLastMessagesTs().get(i);
                             ctx.client().chatDelete(r -> r.channel(game.getChannelId()).ts(s));
                         }
                     }
 
                     game.setLastMessagesTs(messageTs);
                 } else {
-                    return ctx.ackWithErrors(Map.of("team_pick_number", "Something went wrong"));
+                    return ctx.ackWithErrors(Map.of(Screens.PICK_TEAM_CALLBACK_ID, "It's not your turn to pick"));
                 }
-
-                game.pickTeam(teamPickNumber);
 
                 save();
                 return ctx.ack();
             } catch (Exception e) {
                 e.printStackTrace();
-                return ctx.ackWithErrors(Map.of("team_pick_number", "Something went wrong"));
+                return ctx.ackWithErrors(Map.of(Screens.PICK_TEAM_CALLBACK_ID, "Something went wrong"));
             }
         });
 

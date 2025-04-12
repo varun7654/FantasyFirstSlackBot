@@ -422,7 +422,7 @@ public class Main {
                                     .channel(game.getChannelId())
                                     .ts(game.getLastMessagesTs().get(0))
                                     .blocks(asBlocks(section(section -> section.text(
-                                            markdownText("*" + pickerName +   "* picked " + team.name()
+                                            markdownText(game.getGameName() + ": *" + pickerName + "* picked " + team.name()
                                             )))))
                             );
                         }
